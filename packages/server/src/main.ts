@@ -1,46 +1,49 @@
 // ============================================================
-// 道之光·命理AI系统 — 应用入口 (NestJS)
+// 道之光·命理AI系统 — 单一入口点（Full Mode Only）
+// 无数据库依赖 · 纯引擎 · 所有API来自WebConsoleController
 // ============================================================
 
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
-import { ValidationPipe, Logger } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
+import type { NestExpressApplication } from '@nestjs/platform-express';
 
 async function bootstrap() {
-  const logger = new Logger('Bootstrap');
-  const app = await NestFactory.create(AppModule, { logger });
+  const app = await NestFactory.create<NestExpressApplication>(AppModule, {
+    logger: ['log', 'error', 'warn'],
+    abortOnError: false,
+  });
 
-  // 全局管道：参数验证
-  app.useGlobalPipes(new ValidationPipe({
-    whitelist: true,
-    transform: true,
-  }));
+  // 全局路由前缀
+  app.setGlobalPrefix('api/v1');
 
-  // CORS（前后端分离 + WSL跨机访问）
+  // CORS — 允许局域网访问
   app.enableCors({
-    origin: ['http://localhost:5173', 'http://localhost:8080', 'http://localhost:3333', 'http://172.31.138.38:3333'],
+    origin: true,
     credentials: true,
   });
 
-  // API前缀
-  app.setGlobalPrefix('api/v1');
-
-  const configService = app.get(ConfigService);
-  const port = configService.get<number>('PORT', 4000);
-
-  // 尝试连接MongoDB，失败也继续运行（mock模式）
-  try {
-    await app.init();
-    logger.log('Application initialized');
-  } catch (e) {
-    logger.warn(`Init warning (non-fatal): ${e.message}`);
-  }
-
+  const port = parseInt(process.env.PORT || '4000', 10);
   await app.listen(port, '0.0.0.0');
-  logger.log(`🪷 DZS-OS API Server :${port}/api/v1`);
-  console.log(`\n🚀 DZS-OS 道之光命理AI系统 已启动!
-  📡 API: http://localhost:${port}/api/v1
-  🌐 Windows: http://172.31.138.38:${port}/api/v1`);
+
+  console.log(`
+  ┌─────────────────────────────────────────────┐
+  │  🚀 龙道命理计算游戏 (Full Mode) 已启动!      │
+  │  ═══════════════════════════════════════════ │
+  │  📡 API: http://localhost:${port}/api/v1       │
+  │  🌐 CORS: 已启用（局域网可访问）               │
+  │  💾 数据库: 无（纯引擎模式）                    │
+  │  ───────────────────────────────────────── │
+  │  📋 可用API端点:                              │
+  │     POST /bazi/calculate    八字排盘          │
+  │     POST /energy/analyze    五行能量          │
+  │     POST /nine-palace/cal   九宫飞星          │
+  │     POST /ai/generate       AI生成            │
+  │     POST /cv/analyze        CV扫描            │
+  │     GET  /validation/status 验证状态          │
+  └─────────────────────────────────────────────┘`);
 }
-bootstrap();
+
+bootstrap().catch((e: any) => {
+  console.error('❌ 启动失败:', e.message);
+  process.exit(1);
+});

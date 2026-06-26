@@ -1,13 +1,13 @@
 'use client';
 
 import { usePathname } from 'next/navigation';
-import { Compass, Wind, Sun, MessageCircle, TrendingUp } from 'lucide-react';
+import { Compass, Wind, Sun, MessageCircle, TrendingUp, Scan, History } from 'lucide-react';
 
 const NAV_ITEMS = [
   { href: '/h5/fortune', icon: Sun, label: '今日运势' },
   { href: '/h5/wuxing', icon: Wind, label: '五行能量' },
   { href: '/h5/jiugong', icon: Compass, label: '九宫飞星' },
-  { href: '/h5/dayun', icon: TrendingUp, label: '大运流年' },
+  { href: '/h5/cv-scan', icon: Scan, label: '空间扫描' },
   { href: '/h5/ai', icon: MessageCircle, label: 'AI改命' },
 ];
 

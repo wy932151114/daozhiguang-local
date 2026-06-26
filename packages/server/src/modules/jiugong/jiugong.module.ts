@@ -3,12 +3,11 @@
 // ============================================================
 
 import { Module } from '@nestjs/common';
-import { JiugongController } from './jiugong.controller';
 import { JiugongService } from './jiugong.service';
 import { JiugongEngine } from '../../engines';
 
 @Module({
-  controllers: [JiugongController],
+  controllers: [],
   providers: [JiugongService, JiugongEngine],
   exports: [JiugongService, JiugongEngine],
 })

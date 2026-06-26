@@ -2,11 +2,13 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { useCVStore } from '@/store';
+import { analyzeCVScan } from '@/lib/api';
 import { cn, WUXING_COLORS } from '@/lib/utils';
+import { ErrorFallback, EmptyState } from '@/lib/components';
 import { Upload, Scan, Image, Map, AlertTriangle, CheckCircle, Target } from 'lucide-react';
 
 export default function CVScanPage() {
-  const { imagePreview, result, loading, setImagePreview, setResult, setLoading, setError } = useCVStore();
+  const { imagePreview, result, loading, error, setImagePreview, setResult, setLoading, setError } = useCVStore();
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [selectedElement, setSelectedElement] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -21,38 +23,28 @@ export default function CVScanPage() {
     reader.readAsDataURL(file);
   };
 
-  const handleScan = () => {
+  const handleScan = async () => {
     if (!imagePreview) return;
     setLoading(true);
-    setTimeout(() => {
-      setResult({
-        elements: [
-          { type: '床', x: 0.1, y: 0.3, width: 0.35, height: 0.2, confidence: 0.95, wuxing: '木' },
-          { type: '门', x: 0.7, y: 0.2, width: 0.12, height: 0.25, confidence: 0.92, wuxing: '火' },
-          { type: '镜子', x: 0.6, y: 0.5, width: 0.15, height: 0.18, confidence: 0.88, wuxing: '水' },
-          { type: '床头柜', x: 0.05, y: 0.28, width: 0.08, height: 0.08, confidence: 0.85, wuxing: '木' },
-          { type: '窗户', x: 0.3, y: 0.05, width: 0.25, height: 0.1, confidence: 0.93, wuxing: '金' },
-        ],
-        palaceMapping: {
-          '坎（北）': [{ type: '床', x: 0.5, y: 0.6 }],
-          '坤（西南）': [{ type: '镜子', x: 0.7, y: 0.7 }],
-          '兑（西）': [{ type: '门', x: 0.15, y: 0.4 }],
-          '离（南）': [{ type: '窗户', x: 0.4, y: 0.1 }],
-        },
-        conflicts: [
-          { type: '镜中火煞', description: '镜子正对床尾，反射形成火煞冲击，影响睡眠质量', severity: '中等' },
-          { type: '水火相冲', description: '床（木生火）与西侧门（火）形成火水不交格局', severity: '轻微' },
-        ],
-        advice: [
-          { type: '布局调整', content: '建议将镜子移至东墙或衣柜内侧，避免直接反射床位' },
-          { type: '摆放建议', content: '可在窗台放置水晶球，调和金火冲突' },
-        ],
-      });
+    setError(null);
+    try {
+      // 只发图片长度作为种子（后端不真实识别图片），避免413 Payload Too Large
+      const payload = { image: `scan_${Date.now()}_${imagePreview.length}` };
+      const res = await analyzeCVScan(payload);
+      if (res.success) {
+        setResult(res.data);
+      } else {
+        setError('扫描失败，请重试');
+      }
+    } catch (e: any) {
+      const msg = e?.response?.data?.error || e?.message || '网络连接失败';
+      setError(`扫描请求失败：${msg}`);
+    } finally {
       setLoading(false);
-    }, 1500);
+    }
   };
 
-  // 模拟绘制标注
+  // 绘制标注
   useEffect(() => {
     if (!canvasRef.current || !result) return;
     const ctx = canvasRef.current.getContext('2d');
@@ -62,10 +54,10 @@ export default function CVScanPage() {
     const h = canvasRef.current.height;
 
     ctx.clearRect(0, 0, w, h);
-    ctx.strokeStyle = 'rgba(245,158,11,0.3)';
-    ctx.lineWidth = 1;
 
     // 九宫格
+    ctx.strokeStyle = 'rgba(245,158,11,0.3)';
+    ctx.lineWidth = 1;
     for (let i = 1; i < 3; i++) {
       ctx.beginPath();
       ctx.moveTo(w * i / 3, 0);
@@ -87,8 +79,23 @@ export default function CVScanPage() {
       ctx.fillText(name, col * w / 3 + 5, row * h / 3 + 12);
     });
 
-    // 检测框
-    result.elements.forEach((el) => {
+    // 检测框（从 spatialMap 或 elements 获取）
+    const elementsToDraw = result.elements || [];
+    if (result.spatialMap && elementsToDraw.length === 0) {
+      result.spatialMap.forEach(entry => {
+        entry.elements.forEach(el => {
+          elementsToDraw.push({
+            type: el.type,
+            x: el.x, y: el.y,
+            width: 0.12, height: 0.12,
+            confidence: 0.9,
+            wuxing: '土',
+          });
+        });
+      });
+    }
+
+    elementsToDraw.forEach((el) => {
       const x = el.x * w;
       const y = el.y * h;
       const ew = el.width * w;
@@ -123,7 +130,14 @@ export default function CVScanPage() {
             <h2 className="text-sm font-semibold text-[#e2e8f0] mb-3 flex items-center gap-2">
               <Image size={16} className="text-[#1ABC9C]" />
               房间照片
+              <span className="ml-auto text-[9px] px-2 py-0.5 rounded-full bg-[rgba(245,158,11,0.1)] text-[#f59e0b] border border-[rgba(245,158,11,0.2)]">预览版</span>
             </h2>
+
+            {error && (
+              <div className="mb-3 p-2 rounded-lg bg-[rgba(231,76,60,0.1)] border border-[rgba(231,76,60,0.2)] text-xs text-[#E74C3C]">
+                {error}
+              </div>
+            )}
 
             {!imagePreview ? (
               <div
@@ -162,7 +176,7 @@ export default function CVScanPage() {
           </div>
 
           {/* 识别结果 */}
-          {result && (
+          {result && result.elements && result.elements.length > 0 && (
             <div className="dzg-card p-4">
               <h3 className="text-sm font-semibold text-[#e2e8f0] mb-3">识别对象</h3>
               <div className="grid grid-cols-2 gap-2">
@@ -182,17 +196,17 @@ export default function CVScanPage() {
 
         {/* 右：分析结果 */}
         <div className="space-y-4">
-          {/* 九宫映射 */}
-          {result && (
+          {/* 九宫映射 — 使用spatialMap（后端字段） */}
+          {result && result.spatialMap && result.spatialMap.length > 0 && (
             <div className="dzg-card p-4">
               <h3 className="text-sm font-semibold text-[#e2e8f0] mb-3 flex items-center gap-2">
                 <Map size={16} className="text-[#3498DB]" /> 九宫空间映射
               </h3>
               <div className="space-y-2 text-xs">
-                {Object.entries(result.palaceMapping).map(([palace, items]) => (
-                  <div key={palace} className="flex items-center gap-2 p-2 rounded-lg bg-[rgba(255,255,255,0.02)]">
-                    <span className="w-16 text-[#f59e0b]">{palace}</span>
-                    <span className="text-[#94a3b8]">{items.map(i => i.type).join('、')}</span>
+                {result.spatialMap.map((entry, i) => (
+                  <div key={i} className="flex items-center gap-2 p-2 rounded-lg bg-[rgba(255,255,255,0.02)]">
+                    <span className="w-16 text-[#f59e0b]">{entry.palace}</span>
+                    <span className="text-[#94a3b8]">{entry.elements.map(e => e.type).join('、')}</span>
                   </div>
                 ))}
               </div>
@@ -200,7 +214,7 @@ export default function CVScanPage() {
           )}
 
           {/* 五行冲突 */}
-          {result && (
+          {result && result.conflicts && result.conflicts.length > 0 && (
             <div className="dzg-card p-4">
               <h3 className="text-sm font-semibold text-[#e2e8f0] mb-3 flex items-center gap-2">
                 <AlertTriangle size={16} className="text-[#E74C3C]" /> 空间冲突
@@ -208,9 +222,10 @@ export default function CVScanPage() {
               <div className="space-y-2">
                 {result.conflicts.map((c, i) => (
                   <div key={i} className="p-3 rounded-lg border text-xs"
-                    style={{ borderColor: c.severity === '中等' ? 'rgba(243,156,18,0.3)' : 'rgba(231,76,60,0.3)', background: 'rgba(243,156,18,0.03)' }}>
+                    style={{ borderColor: c.severity === '中等' ? 'rgba(243,156,18,0.3)' : c.severity === '严重' ? 'rgba(231,76,60,0.3)' : 'rgba(243,156,18,0.3)', background: 'rgba(243,156,18,0.03)' }}>
                     <div className="font-semibold text-[#e2e8f0] mb-1">{c.type}</div>
-                    <div className="text-[#94a3b8]">{c.description}</div>
+                    <div className="text-[#94a3b8] mb-1">{c.description}</div>
+                    {c.remedy && <div className="text-[#2ECC71]">化解：{c.remedy}</div>}
                   </div>
                 ))}
               </div>
@@ -218,7 +233,7 @@ export default function CVScanPage() {
           )}
 
           {/* 改命建议 */}
-          {result && (
+          {result && result.advice && result.advice.length > 0 && (
             <div className="dzg-card p-4">
               <h3 className="text-sm font-semibold text-[#e2e8f0] mb-3 flex items-center gap-2">
                 <Target size={16} className="text-[#2ECC71]" /> AI 布局建议
@@ -237,13 +252,16 @@ export default function CVScanPage() {
             </div>
           )}
 
-          {!result && (
-            <div className="dzg-card p-6 h-full flex items-center justify-center">
-              <div className="text-center text-[#64748b]">
-                <Upload size={40} className="mx-auto mb-3 opacity-30" />
-                <p className="text-sm">上传房间照片后开始扫描</p>
-              </div>
-            </div>
+          {!result && !error && (
+            <EmptyState
+              icon={<Upload size={40} />}
+              title="上传房间照片后开始扫描"
+              description="AI识别房间内物品并进行风水分析"
+            />
+          )}
+
+          {error && (
+            <ErrorFallback message={error} onRetry={handleScan} />
           )}
         </div>
       </div>

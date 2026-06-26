@@ -1,9 +1,10 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { useSystemStore } from '@/store';
-import { getValidationStatus } from '@/lib/api';
-import { formatEnergy, getRiskColor, cn } from '@/lib/utils';
+import { useSystemStore, useBaziStore } from '@/store';
+import { useValidationQuery } from '@/lib/hooks/queries';
+import { formatEnergy, getRiskColor, WUXING_COLORS, WUXING_NAMES, cn } from '@/lib/utils';
+import { CardSkeleton } from '@/lib/components';
 import {
   Activity, AlertTriangle, Cpu, Zap, Shield, Wind,
   TrendingUp, Clock, ArrowUp, ArrowDown,
@@ -12,7 +13,10 @@ import ReactEChartsCore from 'echarts-for-react';
 
 export default function DashboardPage() {
   const { validationStatus, setValidationStatus, systemMode, setConnected } = useSystemStore();
+  const baziResult = useBaziStore((s) => s.result);
   const [time, setTime] = useState(new Date());
+
+  const { data: validStatus, isLoading: validLoading } = useValidationQuery();
 
   useEffect(() => {
     const t = setInterval(() => setTime(new Date()), 1000);
@@ -20,23 +24,30 @@ export default function DashboardPage() {
   }, []);
 
   useEffect(() => {
-    getValidationStatus().then(setValidationStatus).catch(() => {});
-    setConnected(true);
-  }, [setValidationStatus, setConnected]);
+    if (validStatus) {
+      setValidationStatus(validStatus as any);
+      setConnected(true);
+    }
+  }, [validStatus, setValidationStatus, setConnected]);
 
-  // ===== 模拟数据（后端联调后替换为真实数据） =====
-  const mockData = {
-    energyTotal: 438,
-    stability: 72,
-    riskLevel: 35,
-    dominantElement: '火',
-    weakestElement: '水',
-    todayStar: '武曲星(6)',
-    bestDirection: '西',
-    worstDirection: '东南',
-    yongShen: '火/土',
-    jiShen: '水',
-  };
+  // ===== 从真实数据提取 =====
+  const data = baziResult ? (baziResult as any).data || baziResult : null;
+
+  const energyField = data?.elementBalance?.percentage || {};
+  const radarValues = [
+    energyField.木 || 0,
+    energyField.火 || 0,
+    energyField.土 || 0,
+    energyField.金 || 0,
+    energyField.水 || 0,
+  ];
+  const totalScore = data?.elementBalance?.totalScore || 0;
+  const stability = data?.strength?.strengthScore || 0;
+  const dominantElement = data ? Object.entries(data.elementBalance?.percentage || {}).sort((a:any,b:any)=>b[1]-a[1])[0]?.[0] : '火';
+  const weakestElement = data ? Object.entries(data.elementBalance?.percentage || {}).sort((a:any,b:any)=>a[1]-b[1])[0]?.[0] : '水';
+  const yongShen = data?.usefulGod?.yongShen?.join('/') || '--';
+  const jiShen = data?.usefulGod?.jiShen?.join('/') || '--';
+  const dayMaster = data?.dayMaster || '--';
 
   const radarOption = {
     tooltip: {},
@@ -55,15 +66,21 @@ export default function DashboardPage() {
     },
     series: [{
       type: 'radar',
-      data: [{ value: [65, 85, 45, 30, 55], name: '今日能量', areaStyle: { color: 'rgba(245,158,11,0.2)' }, lineStyle: { color: '#f59e0b', width: 2 }, itemStyle: { color: '#f59e0b' } }],
+      data: [{
+        value: radarValues,
+        name: '今日能量',
+        areaStyle: { color: 'rgba(245,158,11,0.2)' },
+        lineStyle: { color: '#f59e0b', width: 2 },
+        itemStyle: { color: '#f59e0b' },
+      }],
     }],
   };
 
   const KPI_CARDS = [
-    { label: '今日能量总值', value: mockData.energyTotal, unit: '', icon: Zap, color: '#f59e0b', trend: 'up', change: '+12%' },
-    { label: '能量稳定度', value: mockData.stability, unit: '%', icon: Activity, color: '#2ECC71', trend: 'up', change: '+5%' },
-    { label: '风险等级', value: mockData.riskLevel, unit: '%', icon: AlertTriangle, color: getRiskColor(mockData.riskLevel), trend: 'down', change: '-3%' },
-    { label: '主导五行', value: mockData.dominantElement, unit: '', icon: Wind, color: '#E74C3C', trend: 'up', change: '' },
+    { label: '今日能量总值', value: totalScore, unit: '', icon: Zap, color: '#f59e0b', trend: 'up' as const, change: totalScore > 0 ? '已计算' : '' },
+    { label: '能量稳定度', value: stability, unit: '%', icon: Activity, color: '#2ECC71', trend: 'up' as const, change: stability > 0 ? `${stability >= 50 ? '稳定' : '偏弱'}` : '' },
+    { label: '风险等级', value: 0, unit: '%', icon: AlertTriangle, color: getRiskColor(0), trend: 'down' as const, change: '' },
+    { label: '日主五行', value: dayMaster, unit: '', icon: Wind, color: '#E74C3C', trend: 'up' as const, change: WUXING_NAMES[data?.dayMasterElement] || '' },
   ];
 
   return (
@@ -79,9 +96,9 @@ export default function DashboardPage() {
             <Clock size={14} />
             <span>{time.toLocaleTimeString('zh-CN')}</span>
           </div>
-          <div className={cn('flex items-center gap-2', validationStatus?.passed ? 'text-[#2ECC71]' : 'text-[#E74C3C]')}>
+          <div className={cn('flex items-center gap-2', validationStatus?.passed ? 'text-[#2ECC71]' : 'text-[#64748b]')}>
             <Shield size={14} />
-            <span>Validation {validationStatus?.passed ? 'PASS' : '--'}</span>
+            <span>{validLoading ? '检查中...' : validationStatus?.passed ? 'Validation PASS' : 'Validation --'}</span>
           </div>
         </div>
       </div>
@@ -117,9 +134,15 @@ export default function DashboardPage() {
         <div className="dzg-card p-4 col-span-1">
           <div className="flex items-center justify-between mb-3">
             <h3 className="text-sm font-semibold text-[#e2e8f0]">五行能量雷达</h3>
-            <span className="text-[10px] text-[#64748b]">实时</span>
+            <span className="text-[10px] text-[#64748b]">{data ? '已排盘' : '等待排盘'}</span>
           </div>
-          <ReactEChartsCore option={radarOption} style={{ height: 260 }} notMerge />
+          {data ? (
+            <ReactEChartsCore option={radarOption} style={{ height: 260 }} notMerge />
+          ) : (
+            <div className="h-[260px] flex items-center justify-center text-xs text-[#64748b]">
+              请先在八字排盘页面中排盘
+            </div>
+          )}
         </div>
 
         {/* 系统状态 */}
@@ -128,48 +151,52 @@ export default function DashboardPage() {
           <div className="space-y-3">
             <StatusRow label="Kernel" value="运行中" color="#2ECC71" />
             <StatusRow label="Energy Bus" value="激活" color="#2ECC71" />
-            <StatusRow label="Validation" value={validationStatus?.passed ? '通过' : '等待中'} color={validationStatus?.passed ? '#2ECC71' : '#F39C12'} />
+            <StatusRow label="Validation" value={validLoading ? '检查中' : validationStatus?.passed ? '通过' : '等待中'} color={validationStatus?.passed ? '#2ECC71' : '#F39C12'} />
             <StatusRow label="AI Runtime" value="就绪" color="#2ECC71" />
             <StatusRow label="协议版本" value="2.3" color="#94a3b8" />
             <StatusRow label="运行模式" value={systemMode} color="#f59e0b" />
           </div>
         </div>
 
-        {/* 命理摘要 */}
+        {/* 命理摘要 — 真实数据 */}
         <div className="dzg-card p-4 col-span-1">
           <h3 className="text-sm font-semibold text-[#e2e8f0] mb-4">今日命理摘要</h3>
-          <div className="space-y-3">
-            <DetailRow label="当值星" value={mockData.todayStar} />
-            <DetailRow label="用神" value={mockData.yongShen} />
-            <DetailRow label="忌神" value={mockData.jiShen} />
-            <DetailRow label="最佳方位" value={mockData.bestDirection} color="#2ECC71" />
-            <DetailRow label="最差方位" value={mockData.worstDirection} color="#E74C3C" />
-            <DetailRow label="主导五行" value={mockData.dominantElement} />
-            <DetailRow label="最弱五行" value={mockData.weakestElement} />
-          </div>
+          {data ? (
+            <div className="space-y-3">
+              <DetailRow label="日主" value={dayMaster} color="#f59e0b" />
+              <DetailRow label="用神" value={yongShen} color="#2ECC71" />
+              <DetailRow label="忌神" value={jiShen} color="#E74C3C" />
+              <DetailRow label="主导五行" value={WUXING_NAMES[dominantElement] || dominantElement} />
+              <DetailRow label="最弱五行" value={WUXING_NAMES[weakestElement] || weakestElement} />
+              <DetailRow label="身强" value={data?.strength?.bodyStrength || '--'} />
+              <DetailRow label="能量总分" value={`${totalScore}`} color="#f59e0b" />
+            </div>
+          ) : (
+            <div className="h-[200px] flex items-center justify-center text-xs text-[#64748b]">
+              暂无八字数据<br />请先在八字排盘页面排盘
+            </div>
+          )}
         </div>
       </div>
 
-      {/* 底部：最近活动 + 状态 */}
+      {/* 底部：状态面板 */}
       <div className="grid grid-cols-2 gap-6">
         <div className="dzg-card p-4">
           <h3 className="text-sm font-semibold text-[#e2e8f0] mb-3">Activity Log</h3>
           <div className="space-y-2 text-xs text-[#94a3b8]">
-            <ActivityLog time="12:34" event="System initialized" type="info" />
-            <ActivityLog time="12:34" event="Energy Bus connected" type="success" />
-            <ActivityLog time="12:35" event="Validation Center active" type="success" />
-            <ActivityLog time="12:36" event="Protocol v2.3 loaded" type="info" />
-            <ActivityLog time="12:38" event="7 API endpoints registered" type="success" />
+            <ActivityLog time={time.toLocaleTimeString('zh-CN')} event="System running" type="success" />
+            <ActivityLog time="--" event={`Validation: ${validationStatus?.passed ? 'PASS' : 'PENDING'}`} type={validationStatus?.passed ? 'success' : 'warn'} />
+            <ActivityLog time="--" event={`API: ${process.env.NEXT_PUBLIC_API_URL || 'localhost:4000'}`} type="info" />
           </div>
         </div>
         <div className="dzg-card p-4">
           <h3 className="text-sm font-semibold text-[#e2e8f0] mb-3">Validation Checks</h3>
           <div className="space-y-2 text-xs">
-            <CheckRow label="四柱完整性" passed />
-            <CheckRow label="五行正数" passed />
-            <CheckRow label="经度范围" passed />
-            <CheckRow label="真太阳时修正" passed />
-            <CheckRow label="用神一致性" passed />
+            <CheckRow label="四柱完整性" passed={!!data?.pillars} />
+            <CheckRow label="五行正数" passed={!!data?.elementBalance} />
+            <CheckRow label="经度范围" passed={true} />
+            <CheckRow label="真太阳时修正" passed={!!data?.trueSolarTime} />
+            <CheckRow label="用神一致性" passed={!!data?.usefulGod} />
           </div>
         </div>
       </div>
@@ -177,8 +204,7 @@ export default function DashboardPage() {
   );
 }
 
-// ========== 子组件 ==========
-
+// 子组件
 function StatusRow({ label, value, color }: { label: string; value: string; color: string }) {
   return (
     <div className="flex items-center justify-between text-sm">
@@ -204,7 +230,7 @@ function ActivityLog({ time, event, type }: { time: string; event: string; type:
   const colors = { info: '#3498DB', success: '#2ECC71', warn: '#F39C12' };
   return (
     <div className="flex items-center gap-2">
-      <span className="text-[#64748b] w-10">{time}</span>
+      <span className="text-[#64748b] w-16">{time}</span>
       <div className="w-1.5 h-1.5 rounded-full" style={{ background: colors[type] }} />
       <span>{event}</span>
     </div>

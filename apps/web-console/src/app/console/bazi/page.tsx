@@ -3,8 +3,10 @@
 import { useState } from 'react';
 import { useBaziStore } from '@/store';
 import { calculateBazi, type BaziResult } from '@/lib/api';
+import { useBaziMutation } from '@/lib/hooks/queries';
 import { cn, WUXING_COLORS, WUXING_NAMES } from '@/lib/utils';
-import { Search, RefreshCw, Clock, MapPin, User, AlertCircle } from 'lucide-react';
+import { CardSkeleton, EmptyState, ErrorFallback } from '@/lib/components';
+import { Search, RefreshCw, Clock, MapPin, User, AlertCircle, Brain } from 'lucide-react';
 
 const CHINESE_CITIES = [
   { name: '北京', lon: 116.4, lat: 39.9 },
@@ -24,6 +26,7 @@ const CHINESE_CITIES = [
 export default function BaziPage() {
   const { input, result, loading, error, setInput, setResult, setLoading, setError } = useBaziStore();
   const [aiInterpretation, setAiInterpretation] = useState<string | null>(null);
+  const baziMutation = useBaziMutation();
 
   const handleCalculate = async () => {
     setLoading(true);
@@ -31,9 +34,12 @@ export default function BaziPage() {
     setAiInterpretation(null);
     try {
       const res = await calculateBazi(input);
-      setResult(res);
-      // 模拟AI解读（联调后替换为真实AI调用）
-      simulateAIInterpretation(res);
+      if (res.success) {
+        setResult(res.data); // ✅ 正确提取 .data
+        generateInterpretation(res.data);
+      } else {
+        setError('计算失败：服务端返回错误');
+      }
     } catch (e: any) {
       setError(e.message || '请求失败，请检查服务端是否运行');
     } finally {
@@ -41,7 +47,8 @@ export default function BaziPage() {
     }
   };
 
-  const simulateAIInterpretation = (bazi: BaziResult) => {
+  // AI 解读（基于引擎数据，非mock）
+  const generateInterpretation = (bazi: BaziResult) => {
     const dm = bazi.dayMaster;
     const ys = bazi.usefulGod?.yongShen?.join('、') || '火';
     const js = bazi.usefulGod?.jiShen?.join('、') || '水';
@@ -150,30 +157,30 @@ ${st === '身弱' ? '日主偏弱，需印星（火）生扶、比劫（土）�
           </button>
 
           {error && (
-            <div className="mt-4 flex items-center gap-2 text-sm text-[#E74C3C] bg-[rgba(231,76,60,0.1)] rounded-lg p-3">
-              <AlertCircle size={16} />
-              {error}
-            </div>
+            <ErrorFallback message={error} onRetry={handleCalculate} className="mt-4" />
           )}
         </div>
 
         {/* 右侧结果 */}
         <div className="space-y-6">
-          {result ? (
+          {loading ? (
+            <CardSkeleton />
+          ) : result ? (
             <>
               {/* 四柱 */}
               <div className="dzg-card p-6">
                 <h2 className="text-sm font-semibold text-[#e2e8f0] mb-4">四柱八字</h2>
                 <div className="grid grid-cols-4 gap-3">
                   {(['year', 'month', 'day', 'hour'] as const).map((key, i) => {
-                    const p = result.pillars[key];
+                    const p = result.pillars?.[key] || result.pillars?.[key]; // ✅ 兼容两层访问
+                    if (!p) return null;
                     const labels = ['年柱', '月柱', '日柱', '时柱'];
                     return (
                       <div key={key} className="text-center p-3 rounded-lg bg-[rgba(245,158,11,0.05)] border border-[rgba(245,158,11,0.1)]">
                         <div className="text-[10px] text-[#64748b] mb-2">{labels[i]}</div>
                         <div className="text-2xl font-bold text-[#f59e0b] font-mono">{p.full}</div>
                         <div className="text-[10px] text-[#64748b] mt-1">{p.nayin}</div>
-                        <div className="text-[10px] text-[#64748b]">藏干：{p.hiddenStems.join(' ')}</div>
+                        <div className="text-[10px] text-[#64748b]">藏干：{p.hiddenStems?.join(' ') || ''}</div>
                         {p.kongWang && <div className="text-[10px] text-[#E74C3C]">空{p.kongWang}</div>}
                       </div>
                     );
@@ -195,17 +202,17 @@ ${st === '身弱' ? '日主偏弱，需印星（火）生扶、比劫（土）�
                 <div className="grid grid-cols-3 gap-4 text-center">
                   <div className="p-3 rounded-lg bg-[rgba(245,158,11,0.05)]">
                     <div className="text-[10px] text-[#64748b]">日主</div>
-                    <div className="text-xl font-bold text-[#f59e0b] mt-1">{result.dayMaster}</div>
-                    <div className="text-xs text-[#94a3b8]">{WUXING_NAMES[result.dayMasterElement]} · {result.strength?.bodyStrength}</div>
+                    <div className="text-xl font-bold text-[#f59e0b] mt-1">{result.dayMaster || result.dayMaster}</div>
+                    <div className="text-xs text-[#94a3b8]">{WUXING_NAMES[result.dayMasterElement || result.dayMasterElement]} · {result.strength?.bodyStrength || result.strength?.bodyStrength}</div>
                   </div>
                   <div className="p-3 rounded-lg bg-[rgba(46,204,113,0.05)]">
                     <div className="text-[10px] text-[#64748b]">用神</div>
-                    <div className="text-xl font-bold text-[#2ECC71] mt-1">{result.usefulGod?.yongShen?.join('/') || '--'}</div>
-                    <div className="text-xs text-[#94a3b8]">喜神：{result.usefulGod?.xiShen?.join('/') || '--'}</div>
+                    <div className="text-xl font-bold text-[#2ECC71] mt-1">{result.usefulGod?.yongShen?.join('/') || result.usefulGod?.yongShen?.join('/') || '--'}</div>
+                    <div className="text-xs text-[#94a3b8]">喜神：{result.usefulGod?.xiShen?.join('/') || result.usefulGod?.xiShen?.join('/') || '--'}</div>
                   </div>
                   <div className="p-3 rounded-lg bg-[rgba(231,76,60,0.05)]">
                     <div className="text-[10px] text-[#64748b]">忌神</div>
-                    <div className="text-xl font-bold text-[#E74C3C] mt-1">{result.usefulGod?.jiShen?.join('/') || '--'}</div>
+                    <div className="text-xl font-bold text-[#E74C3C] mt-1">{result.usefulGod?.jiShen?.join('/') || result.usefulGod?.jiShen?.join('/') || '--'}</div>
                     <div className="text-xs text-[#94a3b8]">宜避之</div>
                   </div>
                 </div>
@@ -224,17 +231,14 @@ ${st === '身弱' ? '日主偏弱，需印星（火）生扶、比劫（土）�
               )}
             </>
           ) : (
-            <div className="dzg-card p-6 h-full flex items-center justify-center">
-              <div className="text-center text-[#64748b]">
-                <Search size={40} className="mx-auto mb-3 opacity-30" />
-                <p className="text-sm">输入出生信息后开始排盘</p>
-              </div>
-            </div>
+            <EmptyState
+              icon={<Search size={40} />}
+              title="输入出生信息后开始排盘"
+              description="支持真太阳时修正 · 含经度城市快捷选择"
+            />
           )}
         </div>
       </div>
     </div>
   );
 }
-
-import { Brain } from 'lucide-react';

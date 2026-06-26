@@ -1,13 +1,9 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
-import { ArrowLeft, Send, Sparkles, Loader2, Sun, Wind, Compass, BookOpen } from 'lucide-react';
-import BottomNav from '@/app/h5/_components/BottomNav';
-
-/**
- * 道之光 · H5 AI改命问答页面
- * 基于八字排盘 + 道之光思维框架的AI改命建议
- */
+import { ArrowLeft, Send, Sparkles, Loader2, PlusCircle } from 'lucide-react';
+import { generateAI } from '@/lib/api';
+import { useRouter } from 'next/navigation';
 
 const SUGGESTIONS = [
   { icon: '📊', text: '分析我的五行能量' },
@@ -18,6 +14,7 @@ const SUGGESTIONS = [
   { icon: '⏰', text: '近期吉日时辰' },
 ];
 
+// 本地fallback生成
 function generateLocalResponse(question: string, baziData: any): string {
   const dm = baziData?.dayMaster || '未知';
   const strength = baziData?.strength?.bodyStrength || '中和';
@@ -32,10 +29,7 @@ function generateLocalResponse(question: string, baziData: any): string {
   if (question.includes('五行') || question.includes('能量')) {
     const missingText = missing.length ? `缺失五行：${missing.join('、')}` : '五行齐全';
     const excessText = excess.length ? `过旺五行：${excess.join('、')}` : '五行均衡';
-    return `【五行能量分析】\n\n您的日主为${dm}，命格${strength}。\n\n当前五行分布：\n${Object.entries(percentages).map(([k, v]) => `- ${k}：${v}%`).join('\n')}\n主导：${dominant} | 最弱：${weakest}\n\n${missingText}\n${excessText}\n\n用神：${yongShen.join('、')} | 忌神：${jiShen.join('、')}\n\n建议：日常多接触${yongShen.map((s: string) => {
-      const dirMap: Record<string, string> = { '木': '东方·绿色', '火': '南方·红色', '土': '中央·黄色', '金': '西方·白色', '水': '北方·黑色' };
-      return dirMap[s] || s;
-    }).join('、')}元素，有助于平衡命局能量。`;
+    return `【五行能量分析】\n\n您的日主为${dm}，命格${strength}。\n\n当前五行分布：\n${Object.entries(percentages).map(([k, v]) => `- ${k}：${v}%`).join('\n')}\n主导：${dominant} | 最弱：${weakest}\n\n${missingText}\n${excessText}\n\n用神：${yongShen.join('、')} | 忌神：${jiShen.join('、')}\n\n建议：日常多接触${yongShen.map((s: string) => { const dirMap: Record<string, string> = { '木': '东方·绿色', '火': '南方·红色', '土': '中央·黄色', '金': '西方·白色', '水': '北方·黑色' }; return dirMap[s] || s; }).join('、')}元素，有助于平衡命局能量。`;
   }
 
   if (question.includes('方位') || question.includes('方向')) {
@@ -70,7 +64,6 @@ function generateLocalResponse(question: string, baziData: any): string {
     return `【近期吉时参考】\n\n今日：周${today}\n\n⏰ 吉时：${goodHours}\n\n适合在当前时段安排重要事宜。\n\n📅 建议避开：与忌神${jiShen.join('、')}对应的时辰。\n\n改运效果最好的时间段通常是用神对应的时辰。`;
   }
 
-  // 通用回答
   return `【道之光AI改命建议】\n\n您的日主为${dm}，命格${strength}。\n\n关于"${question.slice(0, 20)}..."：\n\n命理不是宿命，而是能量地图。知道自己的五行强弱、用神忌神，就能在关键节点做出更好的选择。\n\n核心建议：\n1. 善用用神（${yongShen.join('、')}）的力量\n2. 避开忌神（${jiShen.join('、')}）的干扰\n3. 平衡五行能量，顺势而为\n\n天道即是人道，修行就是修人。命运掌握在自己手中。`;
 }
 
@@ -81,11 +74,11 @@ interface Message {
 }
 
 export default function AiPage() {
+  const router = useRouter();
   const [baziData, setBaziData] = useState<any>(null);
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
-  const [showSuggestions, setShowSuggestions] = useState(true);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -106,15 +99,24 @@ export default function AiPage() {
     const userMsg: Message = { role: 'user', content: msg, timestamp: new Date() };
     setMessages(prev => [...prev, userMsg]);
     setInput('');
-    setShowSuggestions(false);
     setLoading(true);
 
-    // 模拟AI思考延迟
-    await new Promise(r => setTimeout(r, 600 + Math.random() * 400));
-
-    const response = generateLocalResponse(msg, baziData);
-    const aiMsg: Message = { role: 'assistant', content: response, timestamp: new Date() };
-    setMessages(prev => [...prev, aiMsg]);
+    try {
+      const res = await generateAI({
+        type: 'daily',
+        prompt: msg,
+        systemPrompt: '你是道之光命理AI系统，基于八字命盘提供个性化改命建议。回答要简练、实用、有温度。',
+        baziData: baziData ? { pillars: baziData.pillars, dayMaster: baziData.dayMaster, usefulGod: baziData.usefulGod } : undefined,
+      });
+      const content = res.success ? res.data.output : 'AI服务暂不可用，请稍后再试。';
+      const aiMsg: Message = { role: 'assistant', content, timestamp: new Date() };
+      setMessages(prev => [...prev, aiMsg]);
+    } catch {
+      await new Promise(r => setTimeout(r, 600));
+      const response = generateLocalResponse(msg, baziData);
+      const aiMsg: Message = { role: 'assistant', content: response, timestamp: new Date() };
+      setMessages(prev => [...prev, aiMsg]);
+    }
     setLoading(false);
   };
 
@@ -122,17 +124,36 @@ export default function AiPage() {
     <div className="min-h-screen bg-gradient-to-b from-[#0a0e17] via-[#111827] to-[#0a0e17] text-[#e2e8f0] flex flex-col">
       <header className="sticky top-0 z-10 bg-[#0a0e17]/80 backdrop-blur-lg border-b border-[#1e293b]">
         <div className="flex items-center gap-3 px-4 h-12">
-          <a href="/" className="text-[#94a3b8] hover:text-[#f59e0b] transition-colors">
+          <button onClick={() => router.back()} className="text-[#94a3b8] hover:text-[#f59e0b] transition-colors">
             <ArrowLeft size={20} />
-          </a>
+          </button>
           <h1 className="text-sm font-semibold">AI改命</h1>
           <span className="text-[10px] text-[#64748b] ml-auto">
             {baziData ? `日主${baziData.dayMaster}` : '未排盘'}
           </span>
+          {messages.length > 0 && (
+            <button onClick={() => { setMessages([]); }}
+              className="text-[10px] px-2 py-1 rounded-lg bg-[rgba(245,158,11,0.1)] text-[#f59e0b] hover:bg-[rgba(245,158,11,0.2)] flex items-center gap-1 transition-all">
+              <PlusCircle size={12} /> 新对话
+            </button>
+          )}
         </div>
       </header>
 
-      <div className="flex-1 overflow-y-auto px-4 pt-4 pb-4 space-y-4">
+      {/* 建议栏 — 常驻，对话中也可见 */}
+      <div className="sticky top-12 z-10 bg-[#0a0e17]/90 backdrop-blur-sm border-b border-[#1e293b] px-3 py-2 overflow-x-auto">
+        <div className="flex gap-2 min-w-max">
+          {SUGGESTIONS.map((s, i) => (
+            <button key={i} onClick={() => handleSend(s.text)}
+              className="shrink-0 flex items-center gap-1 px-3 py-1.5 rounded-full bg-[#0f1525] border border-[#1e293b] text-xs text-[#94a3b8] hover:border-[#f59e0b]/30 hover:text-[#e2e8f0] transition-all active:scale-95">
+              <span>{s.icon}</span>
+              <span>{s.text}</span>
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div className="flex-1 overflow-y-auto px-4 pt-3 pb-3 space-y-4">
         {messages.length === 0 ? (
           <>
             {/* 欢迎语 */}
@@ -142,32 +163,17 @@ export default function AiPage() {
               </div>
               <h2 className="text-base font-semibold text-[#f59e0b]">道之光·AI改命</h2>
               <p className="text-xs text-[#64748b] mt-2 leading-relaxed">
-                知命不认命，改运先改心。{'\n'}
-                基于您的八字命盘，为您提供个性化改命建议。
+                知命不认命，改运先改心。{'\\n'}
+                点击上方功能按钮或直接输入问题。
               </p>
+              {!baziData && (
+                <div className="mt-3 p-3 rounded-xl bg-[#1a2332] border border-[#2a3a4e] text-xs text-[#64748b]">
+                  建议先<a href="/" className="text-[#f59e0b] underline">返回首页排盘</a>，获得更精准分析
+                </div>
+              )}
             </div>
-
-            {/* 建议按钮 */}
-            <div className="grid grid-cols-2 gap-2">
-              {SUGGESTIONS.map((s, i) => (
-                <button key={i} onClick={() => handleSend(s.text)}
-                  className="rounded-xl bg-[#0f1525] border border-[#1e293b] p-3 text-left hover:border-[#f59e0b]/20 transition-all active:scale-[0.98]">
-                  <div className="text-lg mb-1">{s.icon}</div>
-                  <div className="text-xs text-[#e2e8f0]">{s.text}</div>
-                </button>
-              ))}
-            </div>
-
-            {/* 排盘提示 */}
-            {!baziData && (
-              <div className="rounded-2xl bg-[#1a2332] border border-[#2a3a4e] p-4 text-center">
-                <p className="text-xs text-[#64748b]">建议先返回首页进行八字排盘，获取更精准的分析</p>
-                <a href="/" className="inline-block mt-2 text-xs text-[#f59e0b] underline">去排盘</a>
-              </div>
-            )}
           </>
         ) : (
-          // 消息列表
           <div className="space-y-4">
             {messages.map((msg, i) => (
               <div key={i} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>

@@ -13,29 +13,33 @@ export class JiugongEngine {
    * 计算指定日期的九宫飞星
    */
   calculate(year: number, month: number, day: number) {
-    const result = calculateNinePalace(year, month, day);
+    const full = calculateNinePalace(year, month, day);
 
-    return {
-      // 按方位排序的九宫盘（前端九宫格渲染用）
-      palaces: result.year.map(p => ({
+    const mapPalace = (arr: typeof full.year, starKey: 'currentStar' | 'yearStar' | 'monthStar' | 'dayStar' = 'currentStar') =>
+      arr.map(p => ({
         position: p.position,
         name: p.name,
         direction: p.direction,
         star: {
-          number: p.currentStar,
-          name: NINE_STARS[p.currentStar].name,
-          wuxing: NINE_STARS[p.currentStar].wuxing,
-          type: NINE_STARS[p.currentStar].type,
-          color: NINE_STARS[p.currentStar].color,
+          number: (p as any)[starKey] || p.currentStar,
+          name: NINE_STARS[(p as any)[starKey] || p.currentStar].name,
+          wuxing: NINE_STARS[(p as any)[starKey] || p.currentStar].wuxing,
+          type: NINE_STARS[(p as any)[starKey] || p.currentStar].type,
+          color: NINE_STARS[(p as any)[starKey] || p.currentStar].color,
         },
         energy: p.energy,
         type: p.type,
         suitable: p.suitable,
         avoid: p.avoid,
-      })),
-      // 总结
-      summary: result.summary,
-      text: ninePalaceToString(result),
+      }));
+
+    return {
+      palaces: mapPalace(full.year),
+      year: mapPalace(full.year, 'currentStar'),
+      month: mapPalace(full.month, 'currentStar'),
+      day: mapPalace(full.day, 'currentStar'),
+      summary: full.summary,
+      text: ninePalaceToString(full),
     };
   }
 

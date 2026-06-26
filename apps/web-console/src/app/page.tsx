@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { useBaziStore } from '@/store';
 
 // 中国主要城市经纬度表（用于快速选择）
 const CITIES: { name: string; lng: number }[] = [
@@ -39,6 +40,42 @@ export default function HomePage() {
   const [result, setResult] = useState<any>(null);
   const [error, setError] = useState('');
   const [history, setHistory] = useState<any[]>([]);
+  const baziStore = useBaziStore();
+
+  // 历史记录点击：按保存的输入参数重新排盘
+  const handleHistoryClick = async (input: any) => {
+    setLoading(true);
+    setError('');
+    setResult(null);
+    try {
+      const payload = {
+        year: input.year || parseInt(year),
+        month: input.month || parseInt(month),
+        day: input.day || parseInt(day),
+        hour: input.hour ?? 12,
+        minute: input.minute ?? 0,
+        gender: input.gender || gender,
+      };
+      if (input.useTrueSolar && input.longitude) {
+        (payload as any).longitude = input.longitude;
+        (payload as any).useTrueSolar = true;
+      }
+      const res = await fetch('/api/v1/bazi/calculate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+      const data = await res.json();
+      if (data.success) {
+        setResult(data.data);
+        baziStore.setResult(data.data);
+        try { sessionStorage.setItem('dzs_bazi_result', JSON.stringify(data.data)); } catch {}
+      } else setError(data.error || '计算失败');
+    } catch {
+      setError('网络错误，请稍后重试');
+    }
+    setLoading(false);
+  };
 
   // 读取历史记录
   useEffect(() => {
@@ -82,13 +119,16 @@ export default function HomePage() {
       const data = await res.json();
       if (data.success) {
         setResult(data.data);
+        // 同步写入Zustand Store，供Console页面读取
+        baziStore.setResult(data.data);
         // 把排盘结果写入sessionStorage，供各H5页面读取
         try { sessionStorage.setItem('dzs_bazi_result', JSON.stringify(data.data)); } catch {}
-        // 保存排盘历史到localStorage
+        // 保存排盘历史到localStorage（含完整输入参数，点击后可重新加载）
         const record = {
           id: Date.now(),
           time: `${year}-${month.padStart(2,'0')}-${day.padStart(2,'0')} ${hour || '?'}:${minute.padStart(2,'0')}`,
           gender,
+          input: { year: parseInt(year), month: parseInt(month), day: parseInt(day), hour: hour ? parseInt(hour) : 12, minute: parseInt(minute || '0'), gender, longitude: useTrueSolar ? parseFloat(longitude) : undefined, useTrueSolar },
           pillars: data.data.pillars,
           dayMaster: data.data.dayMaster,
           trueSolar: useTrueSolar ? `经度${longitude}°E` : undefined,
@@ -336,7 +376,8 @@ export default function HomePage() {
               </div>
               <div className="space-y-2">
                 {history.map((rec: any) => (
-                  <div key={rec.id} className="flex items-center justify-between bg-[#1a2332] rounded-lg px-3 py-2 border border-[#2a3a4e]">
+                  <div key={rec.id} onClick={() => rec.input && handleHistoryClick(rec.input)}
+                    className="flex items-center justify-between bg-[#1a2332] rounded-lg px-3 py-2 border border-[#2a3a4e] cursor-pointer hover:border-[#f59e0b]/40 transition-all">
                     <div className="flex items-center gap-2">
                       <span className="text-xs text-[#f59e0b] font-mono">{rec.pillars?.year?.full} {rec.pillars?.month?.full} {rec.pillars?.day?.full}</span>
                       <span className="text-[10px] text-[#64748b]">{rec.time}</span>
@@ -355,22 +396,26 @@ export default function HomePage() {
       {/* 功能入口 */}
       {!result && (
         <section className="px-4 mb-6">
-          <div className="grid grid-cols-3 gap-2">
+          <div className="grid grid-cols-4 gap-2">
             {[
               { icon: '☯', label: '每日运势', color: '#f59e0b', desc: '今日宜忌·五行吉位' },
               { icon: '🔥', label: '五行能量', color: '#E74C3C', desc: '实时能量图谱' },
-              { icon: '📈', label: '大运流年', color: '#8E44AD', desc: '十年大运·流年分析' },
+              { icon: '📈', label: '大运流年', color: '#8E44AD', desc: '十年大运' },
               { icon: '🧭', label: '九宫飞星', color: '#3498DB', desc: '流年吉凶方位' },
+              { icon: '📷', label: 'CV扫描', color: '#1ABC9C', desc: '房间风水分析' },
               { icon: '🤖', label: 'AI改命', color: '#9B59B6', desc: '个性化改运方案' },
               { icon: '📋', label: '排盘历史', color: '#2ECC71', desc: `最近${history.length}次记录` },
+              { icon: '🏠', label: '管理后台', color: '#94a3b8', desc: 'Console面板' },
             ].map((item) => {
               const h5Paths: Record<string, string> = {
                 '每日运势': '/h5/fortune',
                 '五行能量': '/h5/wuxing',
                 '九宫飞星': '/h5/jiugong',
+                'CV扫描': '/h5/cv-scan',
                 'AI改命': '/h5/ai',
                 '大运流年': '/h5/dayun',
                 '排盘历史': history.length > 0 ? '#history' : '/h5/fortune',
+                '管理后台': '/console/dashboard',
               };
               return (
               <a key={item.label} href={h5Paths[item.label] || '/console/dashboard'}

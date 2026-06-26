@@ -2,7 +2,7 @@
 // 道之光·命理AI系统 — 八字模块：控制器
 // ============================================================
 
-import { Controller, Post, Get, Param, Body, UseGuards } from '@nestjs/common';
+import { Controller, Post, Body } from '@nestjs/common';
 import { BaziService } from './bazi.service';
 
 @Controller('bazi')
@@ -11,7 +11,7 @@ export class BaziController {
 
   /**
    * POST /api/v1/bazi/calculate
-   * 八字排盘
+   * 八字排盘（纯规则引擎）
    */
   @Post('calculate')
   async calculate(@Body() input: {
@@ -23,18 +23,7 @@ export class BaziController {
     gender: '男' | '女';
     longitude?: number;
     useTrueSolar?: boolean;
-    saveToHistory?: boolean;
-    userId?: string;
   }) {
     return this.baziService.calculate(input);
-  }
-
-  /**
-   * GET /api/v1/bazi/:id
-   * 获取历史排盘结果
-   */
-  @Get(':id')
-  async getById(@Param('id') id: string) {
-    return this.baziService.getById(id);
   }
 }

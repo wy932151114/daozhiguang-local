@@ -140,9 +140,9 @@ export default function JiugongPage() {
     <div className="min-h-screen bg-gradient-to-b from-[#0a0e17] via-[#111827] to-[#0a0e17] text-[#e2e8f0]">
       <header className="sticky top-0 z-10 bg-[#0a0e17]/80 backdrop-blur-lg border-b border-[#1e293b]">
         <div className="flex items-center gap-3 px-4 h-12">
-          <a href="/" className="text-[#94a3b8] hover:text-[#f59e0b] transition-colors">
+          <button onClick={() => window.history.back()} className="text-[#94a3b8] hover:text-[#f59e0b] transition-colors">
             <ArrowLeft size={20} />
-          </a>
+          </button>
           <h1 className="text-sm font-semibold">九宫飞星</h1>
           <span className="text-[10px] text-[#64748b] ml-auto">
             {now.getFullYear()}年{now.getMonth() + 1}月{now.getDate()}日

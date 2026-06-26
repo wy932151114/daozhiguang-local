@@ -106,10 +106,12 @@ interface JiugongState {
   result: NinePalaceResult | null;
   selectedPalace: number | null;
   loading: boolean;
+  error: string | null;
   setDate: (d: Partial<JiugongState['date']>) => void;
   setResult: (r: NinePalaceResult | null) => void;
   setSelectedPalace: (n: number | null) => void;
   setLoading: (v: boolean) => void;
+  setError: (e: string | null) => void;
 }
 
 export const useJiugongStore = create<JiugongState>((set) => ({
@@ -121,10 +123,12 @@ export const useJiugongStore = create<JiugongState>((set) => ({
   result: null,
   selectedPalace: null,
   loading: false,
+  error: null,
   setDate: (d) => set((s) => ({ date: { ...s.date, ...d } })),
   setResult: (r) => set({ result: r }),
   setSelectedPalace: (n) => set({ selectedPalace: n }),
   setLoading: (v) => set({ loading: v }),
+  setError: (e) => set({ error: e }),
 }));
 
 // ============================================================

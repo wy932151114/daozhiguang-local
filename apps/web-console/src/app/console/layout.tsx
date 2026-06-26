@@ -7,7 +7,7 @@ import {
   LayoutDashboard, Cpu, Wind, Grid3X3, Brain, Scan,
 } from 'lucide-react';
 import { useEffect } from 'react';
-import { useSystemStore } from '@/store';
+import { useSystemStore, useBaziStore } from '@/store';
 
 const NAV_ITEMS = [
   { href: '/console/dashboard', label: 'Dashboard', icon: LayoutDashboard, color: '#f59e0b' },
@@ -18,9 +18,12 @@ const NAV_ITEMS = [
   { href: '/console/cv-scan', label: 'CV扫描', icon: Scan, color: '#1ABC9C' },
 ];
 
+import { ConsoleGate } from '@/lib/console-gate';
+
 export default function ConsoleLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const { isConnected, setConnected } = useSystemStore();
+  const baziStore = useBaziStore();
 
   useEffect(() => {
     setConnected(true);
@@ -28,7 +31,21 @@ export default function ConsoleLayout({ children }: { children: React.ReactNode 
     return () => clearInterval(interval);
   }, [setConnected]);
 
+  // 从 sessionStorage 恢复排盘数据（适配从首页 <a> 导航过来的情况）
+  useEffect(() => {
+    if (!baziStore.result) {
+      try {
+        const stored = sessionStorage.getItem('dzs_bazi_result');
+        if (stored) {
+          const parsed = JSON.parse(stored);
+          baziStore.setResult(parsed);
+        }
+      } catch {}
+    }
+  }, []);
+
   return (
+    <ConsoleGate>
     <div className="flex h-screen">
       {/* 左侧导航 */}
       <aside className="w-64 flex-shrink-0 border-r border-[#1e293b] bg-[#0f1525] flex flex-col">
@@ -84,5 +101,6 @@ export default function ConsoleLayout({ children }: { children: React.ReactNode 
         </div>
       </main>
     </div>
+    </ConsoleGate>
   );
 }

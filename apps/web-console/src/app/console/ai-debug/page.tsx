@@ -3,50 +3,47 @@
 import { useAiDebugStore, useBaziStore } from '@/store';
 import { generateAI } from '@/lib/api';
 import { cn } from '@/lib/utils';
+import { ErrorFallback, EmptyState } from '@/lib/components';
 import { Send, RefreshCw, AlertTriangle, CheckCircle, FileText, Brain, Code, Shield, Zap } from 'lucide-react';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 
 export default function AiDebugPage() {
   const { prompt, systemPrompt, result, loading, error, setPrompt, setSystemPrompt, setResult, setLoading, setError } = useAiDebugStore();
   const baziResult = useBaziStore((s) => s.result);
+  const baziStore = useBaziStore();
   const [activeTab, setActiveTab] = useState<'output' | 'validation' | 'risk' | 'tokens'>('output');
+
+  // 从 sessionStorage 恢复排盘数据
+  useEffect(() => {
+    if (!baziResult) {
+      try {
+        const stored = sessionStorage.getItem('dzs_bazi_result');
+        if (stored) {
+          const parsed = JSON.parse(stored);
+          baziStore.setResult(parsed);
+        }
+      } catch {}
+    }
+  }, []);
 
   const handleGenerate = async () => {
     setLoading(true);
     setError(null);
     try {
+      const baziData = baziResult ? ((baziResult as any).data || baziResult) : undefined;
       const res = await generateAI({
         type: 'daily',
         prompt,
         systemPrompt,
-        baziData: baziResult || undefined,
+        baziData: baziData ? { pillars: baziData.pillars, dayMaster: baziData.dayMaster, usefulGod: baziData.usefulGod } : undefined,
       });
-      setResult(res);
+      if (res.success) {
+        setResult(res.data);
+      } else {
+        setError('AI生成失败：服务端返回错误');
+      }
     } catch (e: any) {
-      // 模拟数据
-      setResult({
-        output: `【今日运势报告】
-
-日主${baziResult?.dayMaster || '己'}${baziResult?.dayMasterElement ? '土' : ''} · ${baziResult?.strength?.bodyStrength || '中和'}
-
-今日整体运势平稳。五行中火能量偏旺（38%），土次之（27%）。
-
-✦ 最佳时辰：午时（11:00-13:00）
-✦ 最佳方位：西方
-✦ 适宜活动：沟通、社交、创作
-✦ 禁忌事项：东南方不宜动土、不宜冒险投资
-
-改命建议：
-① 今日宜穿黄色/红色系衣物增强土火能量
-② 午时面向西方进行重要决策
-③ 避免与水相关活动（北方不宜久留）
-④ 可在办公桌西侧放置金属摆件
-
-—— 道之光AI命理系统 生成`,
-        validation: { passed: true, errors: [], warnings: ['时辰在子时跨日范围'] },
-        tokenUsage: { prompt: 1250, completion: 380, total: 1630 },
-        riskCheck: { passed: true, warnings: [] },
-      });
+      setError(e.message || '请求失败，请检查服务端是否运行');
     } finally {
       setLoading(false);
     }
@@ -87,7 +84,12 @@ export default function AiDebugPage() {
               <Code size={16} className="text-[#2ECC71]" /> 注入数据预览
             </h2>
             <pre className="text-xs text-[#94a3b8] bg-[#0a0e17] rounded-lg p-3 overflow-x-auto max-h-32">
-              {baziResult ? JSON.stringify({ pillars: baziResult.pillars, dayMaster: baziResult.dayMaster, usefulGod: baziResult.usefulGod }, null, 2) : '暂无八字数据'}
+              {baziResult ? JSON.stringify(
+                { pillars: (baziResult as any).data?.pillars || baziResult.pillars,
+                  dayMaster: (baziResult as any).data?.dayMaster || baziResult.dayMaster,
+                  usefulGod: (baziResult as any).data?.usefulGod || baziResult.usefulGod },
+                null, 2
+              ) : '暂无八字数据'}
             </pre>
           </div>
 
@@ -123,12 +125,15 @@ export default function AiDebugPage() {
 
           <div className="dzg-card p-4 min-h-[400px]">
             {!result ? (
-              <div className="h-full flex items-center justify-center">
-                <div className="text-center text-[#64748b]">
-                  <Brain size={40} className="mx-auto mb-3 opacity-30" />
-                  <p className="text-sm">设置Prompt后点击生成</p>
-                </div>
-              </div>
+              error ? (
+                <ErrorFallback message={error} onRetry={handleGenerate} />
+              ) : (
+                <EmptyState
+                  icon={<Brain size={40} />}
+                  title="设置Prompt后点击生成"
+                  description="结果将在此处展示"
+                />
+              )
             ) : (
               <>
                 {activeTab === 'output' && (
@@ -139,9 +144,13 @@ export default function AiDebugPage() {
                         Validation {result.validation?.passed ? 'PASS' : 'FAIL'}
                       </span>
                     </div>
-                    <div className="text-sm text-[#cbd5e1] whitespace-pre-line leading-relaxed">
-                      {result.output}
-                    </div>
+                    {result.output ? (
+                      <div className="text-sm text-[#cbd5e1] whitespace-pre-line leading-relaxed">
+                        {result.output}
+                      </div>
+                    ) : (
+                      <EmptyState icon={<Brain size={32} />} title="AI返回为空" description="请检查API Key配置和Prompt内容" />
+                    )}
                   </div>
                 )}
 
@@ -157,11 +166,8 @@ export default function AiDebugPage() {
                         {result.validation.errors.map((e, i) => <div key={i} className="text-xs text-[#94a3b8] bg-[rgba(231,76,60,0.05)] p-2 rounded mb-1">{e}</div>)}
                       </div>
                     )}
-                    {result.validation?.warnings?.length > 0 && (
-                      <div>
-                        <div className="text-xs text-[#F39C12] mb-1">警告 ({result.validation.warnings.length})</div>
-                        {result.validation.warnings.map((e, i) => <div key={i} className="text-xs text-[#94a3b8] bg-[rgba(243,156,18,0.05)] p-2 rounded mb-1">{e}</div>)}
-                      </div>
+                    {result.validation?.errors?.length === 0 && result.validation?.warnings?.length === 0 && (
+                      <div className="text-xs text-[#2ECC71]">✅ 所有验证通过</div>
                     )}
                   </div>
                 )}
@@ -206,12 +212,6 @@ export default function AiDebugPage() {
               </>
             )}
           </div>
-
-          {error && (
-            <div className="flex items-center gap-2 text-sm text-[#E74C3C] bg-[rgba(231,76,60,0.1)] rounded-lg p-3">
-              <AlertTriangle size={16} /> {error}
-            </div>
-          )}
         </div>
       </div>
     </div>

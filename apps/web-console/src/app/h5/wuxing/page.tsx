@@ -83,9 +83,9 @@ export default function WuxingPage() {
       {/* 顶部导航 */}
       <header className="sticky top-0 z-10 bg-[#0a0e17]/80 backdrop-blur-lg border-b border-[#1e293b]">
         <div className="flex items-center gap-3 px-4 h-12">
-          <a href="/" className="text-[#94a3b8] hover:text-[#f59e0b] transition-colors">
+          <button onClick={() => window.history.back()} className="text-[#94a3b8] hover:text-[#f59e0b] transition-colors">
             <ArrowLeft size={20} />
-          </a>
+          </button>
           <h1 className="text-sm font-semibold">五行能量</h1>
           <span className="text-[10px] text-[#64748b] ml-auto">
             {baziData?.dayMaster ? `日主${baziData.dayMaster} · ${baziData.strength?.bodyStrength || ''}` : ''}

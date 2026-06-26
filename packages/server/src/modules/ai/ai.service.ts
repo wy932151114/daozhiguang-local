@@ -3,8 +3,7 @@
 // 调用外部LLM + Prompt模板引擎 + 规则约束
 // ============================================================
 
-import { Injectable, Logger, Inject } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
+import { Injectable, Logger } from '@nestjs/common';
 import OpenAI from 'openai';
 import {
   ROLE_SYSTEM_PROMPT,
@@ -28,19 +27,39 @@ export interface AiChatOptions {
 @Injectable()
 export class AiService {
   private readonly logger = new Logger(AiService.name);
-  private client: OpenAI;
-  private model: string;
+  private client: OpenAI | null = null;
+  private model: string = 'gpt-4o-mini';
 
-  constructor(@Inject(ConfigService) private configService: ConfigService) {
-    const provider = this.configService.get<string>('ai.provider', 'openai');
-    const apiKey = this.configService.get<string>('ai.apiKey', '');
-    this.model = this.configService.get<string>('ai.model', 'gpt-4o-mini');
+  constructor() {
+    const provider = process.env['AI_PROVIDER'] || 'openai';
+    const apiKey = process.env['AI_API_KEY'] || '';
+    this.model = process.env['AI_MODEL'] || 'gpt-4o-mini';
 
     if (provider === 'openai' && apiKey) {
       this.client = new OpenAI({ apiKey });
     } else {
       this.logger.warn('⚠️ AI未配置API Key，使用mock模式');
     }
+  }
+
+  /**
+   * 通用生成接口（供 WebConsoleController 调用）
+   * 将 { type, prompt, systemPrompt, baziData } 映射到 chat 接口
+   */
+  async generate(input: {
+    type?: string;
+    prompt?: string;
+    systemPrompt?: string;
+    baziData?: any;
+  }) {
+    const context = input.baziData ? {
+      baziText: JSON.stringify(input.baziData, null, 2),
+    } : undefined;
+
+    return this.chat(
+      input.prompt || '请生成命理分析报告',
+      context,
+    );
   }
 
   /**

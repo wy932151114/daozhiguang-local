@@ -3,12 +3,11 @@
 // ============================================================
 
 import { Module } from '@nestjs/common';
-import { WuxingController } from './wuxing.controller';
 import { WuxingService } from './wuxing.service';
 import { WuxingEngine } from '../../engines';
 
 @Module({
-  controllers: [WuxingController],
+  controllers: [],
   providers: [WuxingService, WuxingEngine],
   exports: [WuxingService, WuxingEngine],
 })
