@@ -5,7 +5,7 @@ import { ArrowLeft, Sun, Moon, Wind, Droplets, Flame, Sparkles } from 'lucide-re
 import BottomNav from '@/app/h5/_components/BottomNav';
 
 /**
- * 道之光 · H5 每日运势页面
+ * 道之自然 · H5 每日运势页面
  * 基于八字排盘 + 当日干支的运势分析
  */
 

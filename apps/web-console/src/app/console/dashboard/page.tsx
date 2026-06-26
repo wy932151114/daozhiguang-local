@@ -89,7 +89,7 @@ export default function DashboardPage() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-[#e2e8f0] tracking-tight">DZS-OS Dashboard</h1>
-          <p className="text-sm text-[#64748b] mt-1">道之光命理AI操作系统 · 实时监控面板</p>
+          <p className="text-sm text-[#64748b] mt-1">道之自然命理AI操作系统 · 实时监控面板</p>
         </div>
         <div className="flex items-center gap-4 text-sm text-[#94a3b8]">
           <div className="flex items-center gap-2">

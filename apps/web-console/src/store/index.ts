@@ -147,7 +147,7 @@ interface AiDebugState {
   setError: (e: string | null) => void;
 }
 
-const DEFAULT_SYSTEM_PROMPT = `你是道之光命理AI系统。
+const DEFAULT_SYSTEM_PROMPT = `你是道之自然命理AI系统。
 核心原则：
 1. 命理是基础，改命是目的
 2. 必须提供解决方案

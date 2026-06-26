@@ -39,3 +39,6 @@ coverage/
 packages/core/__tests__/*.js
 packages/core/__tests__/*.d.ts
 packages/core/__tests__/*.d.ts.map
+
+# Static export (local build artifacts)
+out/

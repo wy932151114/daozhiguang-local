@@ -54,7 +54,7 @@ export default function ConsoleLayout({ children }: { children: React.ReactNode 
           <div className="w-8 h-8 rounded-full bg-gradient-to-br from-[#f59e0b] to-[#d97706] flex items-center justify-center text-black font-bold text-sm">{'道'}</div>
           <div>
             <div className="text-[#f59e0b] font-bold text-sm tracking-wider">DZS-OS</div>
-            <div className="text-[#64748b] text-[10px]">v1.0.0 · 道之光命理OS</div>
+            <div className="text-[#64748b] text-[10px]">v1.0.0 · 道之自然命理OS</div>
           </div>
         </div>
 

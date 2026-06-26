@@ -3,10 +3,12 @@
 import { useState, useEffect } from 'react';
 import { ArrowLeft, Info } from 'lucide-react';
 import BottomNav from '@/app/h5/_components/BottomNav';
+import { calculateNinePalaceApi } from '@/lib/api';
+import type { PalaceData } from '@/lib/api';
 
 /**
- * 道之光 · H5 九宫飞星页面
- * 洛书九宫 + 流年/流月/日飞星展示
+ * 道之自然 · H5 九宫飞星页面
+ * 洛书九宫 + 流年/流月/日飞星展示（后端 API 驱动）
  */
 
 const PALACE_NAMES: Record<number, string> = {
@@ -24,60 +26,24 @@ const STAR_TYPES: Record<number, string> = {
   5: '大凶', 6: '吉', 7: '凶', 8: '吉', 9: '吉',
 };
 
-const STAR_WUXING: Record<number, string> = {
-  1: '水', 2: '土', 3: '木', 4: '木', 5: '土', 6: '金', 7: '金', 8: '土', 9: '火',
-};
-
 const STAR_COLORS: Record<string, string> = {
-  '吉': '#2ECC71', '凶': '#E74C3C', '大凶': '#C0392B',
+  '吉': '#2ECC71', '大吉': '#1ABC9C',
+  '凶': '#E74C3C', '大凶': '#C0392B', '中性': '#F39C12',
 };
 
-function getNinePalace(year: number, month: number, day: number) {
-  // 流年飞星入中：后天八卦数 = (年数) mod 9
-  const yearBase = ((year + 6) % 9 + 9) % 9 || 9;
-  // 流月飞星入中：子年起正月8，丑年起正月5，寅年2
-  const monthOffsets: Record<number, number> = { 0: 8, 1: 5, 2: 2 };
-  const yearGanzhi = (year - 4) % 12;
-  const monthBase = (((monthOffsets[yearGanzhi % 3] || 8) + month - 1) % 9 + 9) % 9 || 9;
-  // 日飞星：九星
-  const dayBase = ((day + 3) % 9 + 9) % 9 || 9;
+const directionNames: Record<number, string> = {
+  1: '北', 2: '西南', 3: '东', 4: '东南',
+  5: '中', 6: '西北', 7: '西', 8: '东北', 9: '南',
+};
 
-  // 飞星顺序：入中后按洛书轨迹飞布
-  const luoshu = [5, 1, 3, 4, 9, 2, 6, 7, 8]; // 从5宫开始的经典顺序
-  const positions = [
-    { pos: 4, idx: 0 }, { pos: 9, idx: 1 }, { pos: 2, idx: 2 },
-    { pos: 3, idx: 3 }, { pos: 5, idx: 4 }, { pos: 7, idx: 5 },
-    { pos: 8, idx: 6 }, { pos: 1, idx: 7 }, { pos: 6, idx: 8 },
-  ];
-
-  function flyStar(base: number): Array<{ pos: number; star: number; name: string; type: string; wuxing: string }> {
-    return positions.map(({ pos, idx }) => {
-      const starNum = ((base - 1 + luoshu[idx] - 1) % 9 + 9) % 9 + 1;
-      return {
-        pos,
-        star: starNum,
-        name: STAR_NAMES[starNum] || '',
-        type: STAR_TYPES[starNum] || '',
-        wuxing: STAR_WUXING[starNum] || '',
-      };
-    });
-  }
-
-  return {
-    year: flyStar(yearBase),
-    month: flyStar(monthBase),
-    day: flyStar(dayBase),
-  };
-}
-
-function PalaceGrid({ palaces, title, colors }: { palaces: any[]; title: string; colors?: boolean }) {
+function PalaceGrid({ palaces, title, colors }: { palaces: PalaceData[]; title: string; colors?: boolean }) {
   const grid = [4, 9, 2, 3, 5, 7, 8, 1, 6]; // 洛书九宫位置顺序
   return (
     <div className="rounded-2xl bg-[#0f1525] border border-[#1e293b] p-4">
       <h3 className="text-xs font-semibold mb-3 text-[#94a3b8]">{title}</h3>
       <div className="grid grid-cols-3 gap-1.5 max-w-[300px] mx-auto">
         {grid.map((pos) => {
-          const p = palaces.find((p: any) => p.pos === pos);
+          const p = palaces.find((p: any) => p.position === pos);
           if (!p) return <div key={pos} className="aspect-square rounded-lg bg-[#1a2332] border border-[#2a3a4e]" />;
           const typeColor = STAR_COLORS[p.type] || '#64748b';
           return (
@@ -85,9 +51,9 @@ function PalaceGrid({ palaces, title, colors }: { palaces: any[]; title: string;
               colors ? `border-[${typeColor}]/20` : 'border-[#2a3a4e]'
             }`}>
               <div className="text-lg font-bold" style={colors ? { color: typeColor } : { color: '#f59e0b' }}>
-                {p.star}
+                {p.star?.number}
               </div>
-              <div className="text-[9px] text-[#94a3b8] leading-tight text-center">{PALACE_NAMES[p.pos]}</div>
+              <div className="text-[9px] text-[#94a3b8] leading-tight text-center">{PALACE_NAMES[p.position]}</div>
               {colors && (
                 <div className="text-[8px] mt-0.5" style={{ color: typeColor }}>{p.type}</div>
               )}
@@ -103,6 +69,9 @@ export default function JiugongPage() {
   const [baziData, setBaziData] = useState<any>(null);
   const [mode, setMode] = useState<'year' | 'month' | 'day'>('day');
   const [showDetail, setShowDetail] = useState<number | null>(null);
+  const [result, setResult] = useState<{ year: PalaceData[]; month: PalaceData[]; day: PalaceData[] } | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const now = new Date();
 
   useEffect(() => {
@@ -110,7 +79,29 @@ export default function JiugongPage() {
     if (stored) {
       try { setBaziData(JSON.parse(stored)); } catch {}
     }
+    loadPalace();
   }, []);
+
+  const loadPalace = async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const res = await calculateNinePalaceApi(now.getFullYear(), now.getMonth() + 1, now.getDate());
+      if (res.success) {
+        setResult({
+          year: res.data.year,
+          month: res.data.month,
+          day: res.data.day,
+        });
+      } else {
+        setError('服务端返回错误');
+      }
+    } catch (e: any) {
+      setError(e.message || '网络请求失败');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   // 命宫计算：日干→后天八卦方位
   const MING_GONG: Record<string, number> = {
@@ -126,15 +117,7 @@ export default function JiugongPage() {
   const yongDir = ELEMENT_DIR[yongShen[0]] || '';
   const jiDir = ELEMENT_DIR[jiShen[0]] || '';
 
-  const palaces = getNinePalace(now.getFullYear(), now.getMonth() + 1, now.getDate());
-  const activePalaces = palaces[mode];
-
-  const bestDirection = activePalaces?.filter((p: any) => p.type === '吉' || p.type === '大吉').slice(0, 2) || [];
-  const worstDirection = activePalaces?.filter((p: any) => p.type === '凶' || p.type === '大凶').slice(0, 2) || [];
-
-  const directionNames: Record<number, string> = {
-    1: '北', 2: '西南', 3: '东', 4: '东南', 5: '中', 6: '西北', 7: '西', 8: '东北', 9: '南',
-  };
+  const activePalaces = result ? result[mode] : [];
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-[#0a0e17] via-[#111827] to-[#0a0e17] text-[#e2e8f0]">
@@ -169,69 +152,95 @@ export default function JiugongPage() {
           ))}
         </div>
 
+        {/* 加载状态 */}
+        {loading && !result && (
+          <div className="flex items-center justify-center py-12">
+            <div className="text-sm text-[#64748b] animate-pulse">加载九宫飞星数据...</div>
+          </div>
+        )}
+
+        {/* 错误提示 */}
+        {error && (
+          <div className="rounded-2xl bg-[#1a2332] border border-[#E74C3C]/30 p-4 text-center">
+            <div className="text-[#E74C3C] text-sm mb-2">{error}</div>
+            <button onClick={loadPalace}
+              className="px-4 py-1.5 rounded-lg bg-[rgba(245,158,11,0.1)] border border-[rgba(245,158,11,0.2)] text-[#f59e0b] text-xs">
+              重试
+            </button>
+          </div>
+        )}
+
         {/* 九宫图 */}
-        {activePalaces && (
+        {activePalaces.length > 0 && (
           <PalaceGrid palaces={activePalaces} title={`${mode === 'year' ? '流年' : mode === 'month' ? '流月' : '今日'}九宫飞星`} colors />
         )}
 
         {/* 吉凶方位 */}
-        {activePalaces && (
+        {activePalaces.length > 0 && (
           <div className="grid grid-cols-2 gap-3">
             <div className="rounded-2xl bg-[#0f1525] border border-[#1e293b] p-4">
               <h3 className="text-xs font-semibold mb-2 text-[#2ECC71]">吉方</h3>
               {activePalaces.filter((p: any) => p.type === '吉' || p.type === '大吉').map((p: any) => (
-                <div key={p.pos} className="flex items-center justify-between text-sm py-1">
-                  <span>{PALACE_NAMES[p.pos]}（{directionNames[p.pos]}）</span>
-                  <span className="text-[#2ECC71] text-xs">{p.star}白·{p.name}</span>
+                <div key={p.position} className="flex items-center justify-between text-sm py-1">
+                  <span>{PALACE_NAMES[p.position]}（{directionNames[p.position]}）</span>
+                  <span className="text-[#2ECC71] text-xs">{p.star.number}白·{p.star.name}</span>
                 </div>
               ))}
+              {activePalaces.filter((p: any) => p.type === '吉' || p.type === '大吉').length === 0 && (
+                <div className="text-sm text-[#64748b]">当前时段无吉星</div>
+              )}
             </div>
             <div className="rounded-2xl bg-[#0f1525] border border-[#1e293b] p-4">
               <h3 className="text-xs font-semibold mb-2 text-[#E74C3C]">凶方</h3>
               {activePalaces.filter((p: any) => p.type === '凶' || p.type === '大凶').map((p: any) => (
-                <div key={p.pos} className="flex items-center justify-between text-sm py-1">
-                  <span>{PALACE_NAMES[p.pos]}（{directionNames[p.pos]}）</span>
-                  <span className="text-[#E74C3C] text-xs">{p.star}·{p.name}</span>
+                <div key={p.position} className="flex items-center justify-between text-sm py-1">
+                  <span>{PALACE_NAMES[p.position]}（{directionNames[p.position]}）</span>
+                  <span className="text-[#E74C3C] text-xs">{p.star.number}·{p.star.name}</span>
                 </div>
               ))}
+              {activePalaces.filter((p: any) => p.type === '凶' || p.type === '大凶').length === 0 && (
+                <div className="text-sm text-[#64748b]">当前时段无凶星</div>
+              )}
             </div>
           </div>
         )}
 
         {/* 方位详解 */}
-        <div className="rounded-2xl bg-[#0f1525] border border-[#1e293b] p-4">
-          <h3 className="text-xs font-semibold mb-3 text-[#94a3b8]">九宫方位详解</h3>
-          <div className="space-y-2">
-            {activePalaces?.sort((a: any, b: any) => a.pos - b.pos).map((p: any) => (
-              <div key={p.pos}
-                onClick={() => setShowDetail(showDetail === p.pos ? null : p.pos)}
-                className="flex items-center justify-between py-2 px-2 rounded-lg hover:bg-[#1a2332] cursor-pointer transition-colors"
-              >
-                <div className="flex items-center gap-2">
-                  <span className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${
-                    p.type === '吉' ? 'bg-[#2ECC71]/20 text-[#2ECC71]' :
-                    p.type === '凶' ? 'bg-[#E74C3C]/20 text-[#E74C3C]' :
-                    'bg-[#C0392B]/20 text-[#C0392B]'
-                  }`}>{p.star}</span>
-                  <div>
-                    <div className="text-sm">{PALACE_NAMES[p.pos]} · {p.name}</div>
-                    <div className="text-[10px] text-[#64748b]">方位{directionNames[p.pos]} · 五行{p.wuxing}</div>
+        {activePalaces.length > 0 && (
+          <div className="rounded-2xl bg-[#0f1525] border border-[#1e293b] p-4">
+            <h3 className="text-xs font-semibold mb-3 text-[#94a3b8]">九宫方位详解</h3>
+            <div className="space-y-2">
+              {activePalaces.sort((a: any, b: any) => a.position - b.position).map((p: any) => (
+                <div key={p.position}
+                  onClick={() => setShowDetail(showDetail === p.position ? null : p.position)}
+                  className="flex items-center justify-between py-2 px-2 rounded-lg hover:bg-[#1a2332] cursor-pointer transition-colors"
+                >
+                  <div className="flex items-center gap-2">
+                    <span className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${
+                      p.type === '吉' || p.type === '大吉' ? 'bg-[#2ECC71]/20 text-[#2ECC71]' :
+                      p.type === '凶' || p.type === '大凶' ? 'bg-[#E74C3C]/20 text-[#E74C3C]' :
+                      'bg-[#F39C12]/20 text-[#F39C12]'
+                    }`}>{p.star.number}</span>
+                    <div>
+                      <div className="text-sm">{PALACE_NAMES[p.position]} · {p.star.name}</div>
+                      <div className="text-[10px] text-[#64748b]">方位{directionNames[p.position]} · 五行{p.star.wuxing} · 能量{p.energy}%</div>
+                    </div>
                   </div>
+                  <Info size={14} className="text-[#4a5a6e]" />
                 </div>
-                <Info size={14} className="text-[#4a5a6e]" />
-              </div>
-            ))}
+              ))}
+            </div>
           </div>
-        </div>
+        )}
 
         {/* 命主个人飞星 — 基于八字用神叠加九宫 */}
-        {baziData && (
+        {baziData && activePalaces.length > 0 && (
           <div className="rounded-2xl bg-gradient-to-br from-[#0f1525] to-[#1a2332] border border-[#f59e0b]/10 p-4">
             <h3 className="text-xs font-semibold mb-3 text-[#f59e0b]">命主个人飞星</h3>
             <div className="space-y-2 text-xs">
               <div className="flex items-center gap-2">
                 <span className="text-[#94a3b8]">命宫：</span>
-                <span className="text-[#f59e0b] font-bold">{mingGongNum ? `${PALACE_NAMES[mingGongNum]} (${['北','西南','东','东南','中','西北','西','东北','南'][mingGongNum-1]})` : '—'}</span>
+                <span className="text-[#f59e0b] font-bold">{mingGongNum ? `${PALACE_NAMES[mingGongNum]} (${directionNames[mingGongNum]})` : '—'}</span>
                 <span className="text-[#64748b] ml-1">({dm}日主)</span>
               </div>
               {yongDir && (
@@ -251,10 +260,10 @@ export default function JiugongPage() {
               <div className="mt-2 p-2 rounded-lg bg-[#1a2332] border border-[#2a3a4e]">
                 <div className="text-[10px] text-[#64748b] mb-1">当前{mode === 'year' ? '流年' : mode === 'month' ? '流月' : '今日'}吉位指向</div>
                 <div className="flex gap-2 flex-wrap">
-                  {activePalaces?.filter((p: any) => p.type === '吉' || p.type === '大吉').slice(0, 2).map((p: any) => (
-                    <span key={p.pos} className="text-[10px] text-[#2ECC71]">· {PALACE_NAMES[p.pos]}（{directionNames[p.pos]}）</span>
+                  {activePalaces.filter((p: any) => p.type === '吉' || p.type === '大吉').slice(0, 2).map((p: any) => (
+                    <span key={p.position} className="text-[10px] text-[#2ECC71]">· {PALACE_NAMES[p.position]}（{directionNames[p.position]}）</span>
                   ))}
-                  {(!activePalaces || activePalaces.filter((p: any) => p.type === '吉').length === 0) && (
+                  {activePalaces.filter((p: any) => p.type === '吉' || p.type === '大吉').length === 0 && (
                     <span className="text-[10px] text-[#64748b]">当前时段无吉星</span>
                   )}
                 </div>
@@ -263,33 +272,43 @@ export default function JiugongPage() {
           </div>
         )}
 
-        {/* 当日宜忌（基于日飞星） */}
-        <div className="rounded-2xl bg-[#0f1525] border border-[#1e293b] p-4">
-          <h3 className="text-xs font-semibold mb-3 text-[#94a3b8]">今日提示</h3>
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <div className="text-xs text-[#2ECC71] mb-2">宜往</div>
-              <div className="space-y-1">
-                {palaces.day.filter((p: any) => p.type === '吉').slice(0, 3).map((p: any) => (
-                  <div key={p.pos} className="text-sm text-[#e2e8f0]">
-                    · {directionNames[p.pos]}方（{PALACE_NAMES[p.pos]}）
-                  </div>
-                ))}
+        {/* 今日提示 — 基于日飞星 */}
+        {result && (
+          <div className="rounded-2xl bg-[#0f1525] border border-[#1e293b] p-4">
+            <h3 className="text-xs font-semibold mb-3 text-[#94a3b8]">今日提示</h3>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <div className="text-xs text-[#2ECC71] mb-2">宜往</div>
+                <div className="space-y-1">
+                  {result.day.filter((p: any) => p.type === '吉' || p.type === '大吉').slice(0, 3).map((p: any) => (
+                    <div key={p.position} className="text-sm text-[#e2e8f0]">
+                      · {directionNames[p.position]}方（{PALACE_NAMES[p.position]}）
+                    </div>
+                  ))}
+                  {result.day.filter((p: any) => p.type === '吉' || p.type === '大吉').length === 0 && (
+                    <div className="text-sm text-[#64748b]">今日无吉方</div>
+                  )}
+                </div>
               </div>
-            </div>
-            <div>
-              <div className="text-xs text-[#E74C3C] mb-2">忌往</div>
-              <div className="space-y-1">
-                {palaces.day.filter((p: any) => p.type === '凶' || p.type === '大凶').slice(0, 3).map((p: any) => (
-                  <div key={p.pos} className="text-sm text-[#e2e8f0]">
-                    · {directionNames[p.pos]}方（{PALACE_NAMES[p.pos]}）
-                  </div>
-                ))}
+              <div>
+                <div className="text-xs text-[#E74C3C] mb-2">忌往</div>
+                <div className="space-y-1">
+                  {result.day.filter((p: any) => p.type === '凶' || p.type === '大凶').slice(0, 3).map((p: any) => (
+                    <div key={p.position} className="text-sm text-[#e2e8f0]">
+                      · {directionNames[p.position]}方（{PALACE_NAMES[p.position]}）
+                    </div>
+                  ))}
+                  {result.day.filter((p: any) => p.type === '凶' || p.type === '大凶').length === 0 && (
+                    <div className="text-sm text-[#64748b]">今日无凶方</div>
+                  )}
+                </div>
               </div>
             </div>
           </div>
-        </div>
+        )}
       </div>
+
+      <BottomNav />
 
       <style jsx global>{`
         @keyframes fadeIn {

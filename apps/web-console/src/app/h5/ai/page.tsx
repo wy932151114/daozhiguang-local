@@ -64,7 +64,7 @@ function generateLocalResponse(question: string, baziData: any): string {
     return `【近期吉时参考】\n\n今日：周${today}\n\n⏰ 吉时：${goodHours}\n\n适合在当前时段安排重要事宜。\n\n📅 建议避开：与忌神${jiShen.join('、')}对应的时辰。\n\n改运效果最好的时间段通常是用神对应的时辰。`;
   }
 
-  return `【道之光AI改命建议】\n\n您的日主为${dm}，命格${strength}。\n\n关于"${question.slice(0, 20)}..."：\n\n命理不是宿命，而是能量地图。知道自己的五行强弱、用神忌神，就能在关键节点做出更好的选择。\n\n核心建议：\n1. 善用用神（${yongShen.join('、')}）的力量\n2. 避开忌神（${jiShen.join('、')}）的干扰\n3. 平衡五行能量，顺势而为\n\n天道即是人道，修行就是修人。命运掌握在自己手中。`;
+  return `【道之自然AI改命建议】\n\n您的日主为${dm}，命格${strength}。\n\n关于"${question.slice(0, 20)}..."：\n\n命理不是宿命，而是能量地图。知道自己的五行强弱、用神忌神，就能在关键节点做出更好的选择。\n\n核心建议：\n1. 善用用神（${yongShen.join('、')}）的力量\n2. 避开忌神（${jiShen.join('、')}）的干扰\n3. 平衡五行能量，顺势而为\n\n天道即是人道，修行就是修人。命运掌握在自己手中。`;
 }
 
 interface Message {
@@ -105,7 +105,7 @@ export default function AiPage() {
       const res = await generateAI({
         type: 'daily',
         prompt: msg,
-        systemPrompt: '你是道之光命理AI系统，基于八字命盘提供个性化改命建议。回答要简练、实用、有温度。',
+        systemPrompt: '你是道之自然命理AI系统，基于八字命盘提供个性化改命建议。回答要简练、实用、有温度。',
         baziData: baziData ? { pillars: baziData.pillars, dayMaster: baziData.dayMaster, usefulGod: baziData.usefulGod } : undefined,
       });
       const content = res.success ? res.data.output : 'AI服务暂不可用，请稍后再试。';
@@ -161,7 +161,7 @@ export default function AiPage() {
               <div className="w-12 h-12 mx-auto mb-3 rounded-full bg-gradient-to-br from-[#f59e0b] to-[#d97706] flex items-center justify-center text-black font-bold text-lg">
                 道
               </div>
-              <h2 className="text-base font-semibold text-[#f59e0b]">道之光·AI改命</h2>
+              <h2 className="text-base font-semibold text-[#f59e0b]">道之自然·AI改命</h2>
               <p className="text-xs text-[#64748b] mt-2 leading-relaxed">
                 知命不认命，改运先改心。{'\\n'}
                 点击上方功能按钮或直接输入问题。
@@ -185,7 +185,7 @@ export default function AiPage() {
                   {msg.role === 'assistant' && (
                     <div className="flex items-center gap-1.5 mb-2">
                       <Sparkles size={12} className="text-[#f59e0b]" />
-                      <span className="text-[10px] text-[#f59e0b] font-medium">道之光AI</span>
+                      <span className="text-[10px] text-[#f59e0b] font-medium">道之自然AI</span>
                     </div>
                   )}
                   <div className="text-sm text-[#e2e8f0] whitespace-pre-wrap leading-relaxed">{msg.content}</div>

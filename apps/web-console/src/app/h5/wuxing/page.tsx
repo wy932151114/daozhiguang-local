@@ -5,7 +5,7 @@ import { ArrowLeft } from 'lucide-react';
 import BottomNav from '@/app/h5/_components/BottomNav';
 
 /**
- * 道之光 · H5 五行能量可视化页面
+ * 道之自然 · H5 五行能量可视化页面
  * 基于八字排盘结果的五行能量展示
  */
 

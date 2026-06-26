@@ -24,7 +24,7 @@ const CITIES: { name: string; lng: number }[] = [
 ];
 
 /**
- * 道之光 · H5 用户端首页
+ * 道之自然 · H5 用户端首页
  * 移动端优先，提供八字速查 + 每日运势 + AI改命入口
  */
 export default function HomePage() {
@@ -155,7 +155,7 @@ export default function HomePage() {
         />
         <div className="relative">
           <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-gradient-to-br from-[#f59e0b] to-[#d97706] flex items-center justify-center text-black font-bold text-2xl shadow-lg shadow-[#f59e0b]/20">{'道'}</div>
-          <h1 className="text-2xl font-bold tracking-wider text-[#f59e0b]">道之光</h1>
+          <h1 className="text-2xl font-bold tracking-wider text-[#f59e0b]">道之自然</h1>
           <p className="text-sm text-[#64748b] mt-1">AI 命理 · 知命改运</p>
         </div>
       </header>
@@ -432,7 +432,7 @@ export default function HomePage() {
 
       {/* 底部 */}
       <footer className="px-4 pb-8 text-center">
-        <p className="text-[10px] text-[#4a5a6e]">道之光 · DZS-OS v1.0.0</p>
+        <p className="text-[10px] text-[#4a5a6e]">道之自然 · DZS-OS v1.0.0</p>
         <p className="text-[10px] text-[#3a4a5e] mt-1">AI仅供参考，命运由自己掌握</p>
       </footer>
 

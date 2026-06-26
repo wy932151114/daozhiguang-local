@@ -1,13 +1,11 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   transpilePackages: ['echarts', 'echarts-for-react'],
-  output: 'export',
   trailingSlash: true,
   images: {
     unoptimized: true,
   },
-  // 生产模式下，前端直接访问后端API（同域名）
-  // 开发模式下使用 rewrite 代理
+  // 开发模式下使用 rewrite 代理到后端
   async rewrites() {
     if (process.env.NODE_ENV === 'development') {
       return [
