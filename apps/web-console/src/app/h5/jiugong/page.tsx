@@ -133,7 +133,7 @@ export default function JiugongPage() {
         </div>
       </header>
 
-      <div className="px-4 pt-4 pb-8 space-y-4">
+      <div className="px-4 pt-4 pb-24 space-y-4">
         {/* 模式切换 */}
         <div className="flex gap-2">
           {[

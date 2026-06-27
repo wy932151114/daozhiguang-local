@@ -108,8 +108,11 @@ export default function AiPage() {
         systemPrompt: '你是道之自然命理AI系统，基于八字命盘提供个性化改命建议。回答要简练、实用、有温度。',
         baziData: baziData ? { pillars: baziData.pillars, dayMaster: baziData.dayMaster, usefulGod: baziData.usefulGod } : undefined,
       });
-      const content = res.success ? res.data.output : 'AI服务暂不可用，请稍后再试。';
-      const aiMsg: Message = { role: 'assistant', content, timestamp: new Date() };
+      // 后端AI未实际运行（无token消耗），降级到本地规则引擎
+      if (!res.success || !res.data?.tokenUsage?.total) {
+        throw new Error('AI not configured');
+      }
+      const aiMsg: Message = { role: 'assistant', content: res.data.output, timestamp: new Date() };
       setMessages(prev => [...prev, aiMsg]);
     } catch {
       await new Promise(r => setTimeout(r, 600));

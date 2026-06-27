@@ -48,7 +48,7 @@ function getBalanceAdvice(percentages: Record<string, number>, yongShen: string[
   const min = sorted[sorted.length - 1];
 
   if (percentages[max] > 40) {
-    advice.push(`${max}过旺（${percentages[max]}%），宜泄不宜补。建议佩戴${WUXING_TRAITS[max === '木' ? '金' : max === '火' ? '水' : max === '土' ? '木' : max === '金' ? '火' : '土']}属性饰品。`);
+    advice.push(`${max}过旺（${percentages[max]}%），宜泄不宜补。建议佩戴${max === '木' ? '金' : max === '火' ? '水' : max === '土' ? '木' : max === '金' ? '火' : '土'}属性饰品。`);
   }
   if (percentages[min] < 10) {
     advice.push(`${min}过弱（${percentages[min]}%），需补充${min}能量。多接触${WUXING_TRAITS[min].direction}方、${WUXING_TRAITS[min].color}色物品。`);
