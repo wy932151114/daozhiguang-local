@@ -34,5 +34,5 @@ export type { DZSResponse } from './dzs-kernel';
 
 /** 系统常量 */
 export const DZS_VERSION = '1.0.0';
-export const DZS_NAME = '道之光·东方命理AI操作系统';
-export const DZS_KERNEL_SOURCE = '《道之光·改命纪实录》';
+export const DZS_NAME = '道之自然·东方命理AI操作系统';
+export const DZS_KERNEL_SOURCE = '《道之自然·改命纪实录》';

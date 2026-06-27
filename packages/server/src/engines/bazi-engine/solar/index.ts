@@ -1,5 +1,5 @@
 // ============================================================
-// 道之光·命理引擎 — 太阳时系统统一导出
+// 道之自然·命理引擎 — 太阳时系统统一导出
 // ============================================================
 
 export { calculateTrueSolarTime, quickTrueSolar, getShichen, getShichenBranch } from './trueSolarTime';

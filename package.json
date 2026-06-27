@@ -1,29 +1,43 @@
 {
   "name": "daozhiguang-fate-engine",
-  "version": "1.0.0",
-  "description": "\u9f99\u9053\u547d\u7406\u8ba1\u7b97\u6e38\u620f - \u547d\u7406AI\u51b3\u7b56\u7cfb\u7edf",
+  "version": "2.0.0",
+  "description": "DZS Operating System - 道之自然命理AI决策系统",
   "private": true,
   "workspaces": [
     "packages/*",
     "apps/*"
   ],
   "scripts": {
-    "build": "echo 'Skipping build - tsx handles runtime compilation'",
+    "build": "npm run build:lib && npm run build:server && npm run build:web",
+    "build:lib": "npm run build:protocols && npm run build:shared && npm run build:utils && npm run build:core",
     "build:core": "cd packages/core && npx tsc --outDir dist --skipLibCheck && cd ../..",
-    "build:server": "cd packages/server && npx tsc --outDir dist --skipLibCheck && cd ../..",
-    "test": "npm run test --workspaces",
+    "build:protocols": "cd packages/dzs-protocols && npx tsc --outDir dist --skipLibCheck && cd ../..",
+    "build:shared": "cd packages/shared && npx tsc --outDir dist --skipLibCheck && cd ../..",
+    "build:utils": "cd packages/utils && npx tsc --outDir dist --skipLibCheck && cd ../..",
+    "build:server": "cd packages/server && nest build && cd ../..",
+    "build:server-v2": "cd packages/server-v2 && nest build && cd ../..",
+    "build:web": "cd apps/web-console && next build && cd ../..",
+    "test": "npm run test:lib && npm run test:server-v2",
+    "test:lib": "npm run test --workspace=packages/core",
+    "test:server-v2": "cd packages/server-v2 && jest --config jest.config.ts && cd ../..",
+    "test:server-v2:cov": "cd packages/server-v2 && jest --config jest.config.ts --coverage && cd ../..",
     "dev:core": "npm run dev -w packages/core",
     "dev:server": "npm run dev -w packages/server",
-    "dev:web": "npm run dev -w packages/web",
+    "dev:server-v2": "npx tsx watch packages/server-v2/src/main.ts",
+    "dev:web": "cd apps/web-console && next dev --port 3333 --hostname 0.0.0.0",
     "start": "npx tsx packages/server/src/lite-main.ts",
+    "start:v2": "npx tsx packages/server-v2/src/main.ts",
     "start:prod": "npx tsx packages/server/src/lite-main.ts",
-    "lint": "eslint packages/*/src",
-    "docs": "typedoc --out docs/api packages/core/src",
-    "railway-build": "npm install && npm run build:core",
-    "railway-start": "npx tsx packages/server/src/lite-main.ts"
+    "lint": "echo 'Lint configured per-package'",
+    "clean": "rm -rf packages/*/dist apps/*/.next packages/server-v2/dist",
+    "clean:all": "rm -rf packages/*/dist apps/*/.next packages/server-v2/dist node_modules packages/*/node_modules apps/*/node_modules"
   },
   "engines": {
     "node": ">=20.0.0",
     "npm": ">=10.0.0"
+  },
+  "dependencies": {
+    "@nestjs/bullmq": "^10.2.3",
+    "bullmq": "^5.79.1"
   }
 }

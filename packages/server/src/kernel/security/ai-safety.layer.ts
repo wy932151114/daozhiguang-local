@@ -29,7 +29,7 @@ const FORBIDDEN_PATTERNS = [
   { pattern: /根据[^。]*计算[^。]*八字/i, level: 'high', message: 'AI不可自行计算命理数据' },
   { pattern: /我认为[^。]*五行[^。]*为/i, level: 'high', message: 'AI不可自行判断五行' },
   { pattern: /此命中[^。]*注定/i, level: 'critical', message: '禁止宿命论表述' },
-  { pattern: /无法改变/i, level: 'critical', message: '禁止宿命论表述——道之光原则：命可改' },
+  { pattern: /无法改变/i, level: 'critical', message: '禁止宿命论表述——道之自然原则：命可改' },
   { pattern: /八字[^。]*不好/i, level: 'high', message: '禁止负面命理标签' },
   { pattern: /你[将会|会][^。]*倒[霉|运]/i, level: 'critical', message: '禁止负面预示' },
   { pattern: /祭[祀|拜][^。]*神/i, level: 'medium', message: '避免宗教性表述，使用"祈福"替代' },
@@ -80,7 +80,7 @@ export class AISafetyLayer {
     // 4. 改命导向检查
     const fatalismPattern = /没办法|改不了|就这样了|认命吧/i;
     if (fatalismPattern.test(content)) {
-      violations.push('[critical] 禁止宿命论——道之光核心原则：命可改');
+      violations.push('[critical] 禁止宿命论——道之自然核心原则：命可改');
       sanitized = sanitized.replace(fatalismPattern, '可调整改善');
       flags.push('宿命论内容被拦截');
     }
@@ -101,7 +101,7 @@ export class AISafetyLayer {
    * 为AI输出添加安全前缀
    */
   addDisclaimer(content: string): string {
-    const disclaimer = '\n\n——\n⚖️ 以上内容基于《道之光·改命纪实录》体系生成，仅供决策参考。命运的根本在于自身的努力与选择。';
+    const disclaimer = '\n\n——\n⚖️ 以上内容基于《道之自然·改命纪实录》体系生成，仅供决策参考。命运的根本在于自身的努力与选择。';
     if (content.includes('——')) return content; // 已有免责声明
     return content + disclaimer;
   }

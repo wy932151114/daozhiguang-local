@@ -1,5 +1,5 @@
 // ============================================================
-// 道之光·命理AI系统 — MongoDB Schema: 用户
+// 道之自然·命理AI系统 — MongoDB Schema: 用户
 // ============================================================
 
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';

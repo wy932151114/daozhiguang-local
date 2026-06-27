@@ -1,5 +1,5 @@
 /**
- * 道之光·命理引擎 — 集成验证脚本
+ * 道之自然·命理引擎 — 集成验证脚本
  * 直接运行：npx tsx verify.ts
  */
 
@@ -11,7 +11,7 @@ import { analyzeShenSha } from './src/shensha/shensha';
 import { NINE_STARS, TIAN_GAN } from './src/utils/constants';
 
 console.log('='.repeat(60));
-console.log('道之光·命理AI引擎 — 算法验证'.green ? '道之光·命理AI引擎 — 算法验证' : '道之光·命理AI引擎 — 算法验证');
+console.log('道之自然·命理AI引擎 — 算法验证'.green ? '道之自然·命理AI引擎 — 算法验证' : '道之自然·命理AI引擎 — 算法验证');
 console.log('='.repeat(60));
 
 let passed = 0;

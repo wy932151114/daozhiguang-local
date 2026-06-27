@@ -159,7 +159,7 @@ app.post('/api/v1/ai/generate', (req, res) => {
 ③ 避免${js}色系物品
 ④ 可在办公桌${st === '身弱' ? '西' : '东'}侧放置金属摆件
 
-—— 道之光AI命理系统 生成`;
+—— 道之自然AI命理系统 生成`;
 
   res.json({
     output,

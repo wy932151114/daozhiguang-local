@@ -8,7 +8,7 @@ module.exports = {
   theme: {
     extend: {
       colors: {
-        // 道之光主题色
+        // 道之自然主题色
         dzg: {
           50: '#faf5eb',
           100: '#f0e4c6',

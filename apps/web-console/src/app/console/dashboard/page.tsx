@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useSystemStore, useBaziStore } from '@/store';
 import { useValidationQuery } from '@/lib/hooks/queries';
+import { useAIHealth, useTokenStats } from '@/lib/hooks/ai-runtime-queries';
 import { formatEnergy, getRiskColor, WUXING_COLORS, WUXING_NAMES, cn } from '@/lib/utils';
 import { CardSkeleton } from '@/lib/components';
 import {
@@ -17,6 +18,8 @@ export default function DashboardPage() {
   const [time, setTime] = useState(new Date());
 
   const { data: validStatus, isLoading: validLoading } = useValidationQuery();
+  const { data: aiHealth } = useAIHealth();
+  const { data: tokenStats } = useTokenStats();
 
   useEffect(() => {
     const t = setInterval(() => setTime(new Date()), 1000);
@@ -179,6 +182,39 @@ export default function DashboardPage() {
         </div>
       </div>
 
+      {/* AI Runtime 状态卡片 */}
+      <div className="dzg-card p-4">
+        <h3 className="text-sm font-semibold text-[#e2e8f0] mb-4">AI Runtime</h3>
+        <div className="grid grid-cols-4 gap-4">
+          <StatusMiniCard
+            label="Provider 在线"
+            value={aiHealth
+              ? `${(aiHealth.providers || []).filter((p: any) => p.status === 'healthy').length}/${aiHealth.providerCount || 0}`
+              : '--'}
+            color="#8B5CF6"
+          />
+          <StatusMiniCard
+            label="今日 Token"
+            value={tokenStats ? (tokenStats.totalTokens ?? 0).toLocaleString() : '--'}
+            color="#f59e0b"
+          />
+          <StatusMiniCard
+            label="缓存命中率"
+            value={tokenStats?.cacheHitRate != null
+              ? `${(tokenStats.cacheHitRate * 100).toFixed(1)}%`
+              : aiHealth?.cacheEnabled != null
+                ? (aiHealth.cacheEnabled ? '启用' : '禁用')
+                : '--'}
+            color="#2ECC71"
+          />
+          <StatusMiniCard
+            label="平均响应"
+            value={tokenStats?.avgDuration != null ? `${tokenStats.avgDuration.toFixed(0)}ms` : '--'}
+            color="#3498DB"
+          />
+        </div>
+      </div>
+
       {/* 底部：状态面板 */}
       <div className="grid grid-cols-2 gap-6">
         <div className="dzg-card p-4">
@@ -244,6 +280,15 @@ function CheckRow({ label, passed }: { label: string; passed: boolean }) {
       <span className={passed ? 'text-[#2ECC71]' : 'text-[#E74C3C]'}>
         {passed ? '✓' : '✗'}
       </span>
+    </div>
+  );
+}
+
+function StatusMiniCard({ label, value, color }: { label: string; value: string; color: string }) {
+  return (
+    <div className="p-3 rounded-lg" style={{ background: `${color}08` }}>
+      <div className="text-xs text-[#64748b] mb-1">{label}</div>
+      <div className="text-lg font-bold" style={{ color }}>{value}</div>
     </div>
   );
 }

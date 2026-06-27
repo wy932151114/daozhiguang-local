@@ -1,10 +1,10 @@
 // ============================================================
-// 道之光五行动态能量引擎 (WuXingEnergyEngine)
+// 道之自然五行动态能量引擎 (WuXingEnergyEngine)
 // 
 // 不再是传统静态五行评分。
 // 而是包含：
 //   - 基础八字五行
-//   - 月令季节加持/衰减（道之光月令×2.0特色）
+//   - 月令季节加持/衰减（道之自然月令×2.0特色）
 //   - 节气衰减因子
 //   - 九宫方位影响
 //   - 流年天干影响
@@ -61,7 +61,7 @@ export class WuXingEnergyEngine {
       const base = baseScores[el] || 0;
       const basePct = base / totalBase;
 
-      // 月令季节加持（道之光特色：月令加倍）
+      // 月令季节加持（道之自然特色：月令加倍）
       let seasonalBoost = 0;
       if (el === monthElement) {
         seasonalBoost = base * 1.0; // 月令同五行，加倍

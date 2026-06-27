@@ -1,5 +1,5 @@
 // ============================================================
-// 道之光·命理AI引擎 — 核心类型定义
+// 道之自然·命理AI引擎 — 核心类型定义
 // dao-zhi-guang fate engine — core type system
 // ============================================================
 
@@ -285,7 +285,7 @@ export interface FortuneStrategy {
   effectCycle: EffectCycle;
   /** 建议等级 1-5 */
   priority: 1 | 2 | 3 | 4 | 5;
-  /** 原理说明（道之光风格） */
+  /** 原理说明（道之自然风格） */
   principle: string;
   /** 经典出处 */
   classicSource?: string;

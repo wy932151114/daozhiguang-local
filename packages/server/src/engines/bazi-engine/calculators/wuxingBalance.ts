@@ -1,7 +1,7 @@
 // ============================================================
-// 道之光·命理引擎 — 五行平衡计算器
+// 道之自然·命理引擎 — 五行平衡计算器
 // 天干+地支+藏干的五行力量统计
-// 月令加权（道之光特色：月令加倍）
+// 月令加权（道之自然特色：月令加倍）
 // ============================================================
 
 import type { Element5 } from '../core/heavenlyStems';
@@ -20,7 +20,7 @@ export interface ElementScore {
 /**
  * 月令权重表
  * 每个地支在各月的五行力量比重
- * 道之光特色：月令加倍
+ * 道之自然特色：月令加倍
  */
 const MONTH_POWER: Record<BranchName, Record<Element5, number>> = {
   '寅': { wood: 60,  fire: 25, earth: 10, metal: 0,  water: 5  },
@@ -43,7 +43,7 @@ const MONTH_POWER: Record<BranchName, Record<Element5, number>> = {
  * 1. 天干透干（高权重）
  * 2. 地支本气（中等权重）
  * 3. 藏干余气（低权重）
- * 4. 月令加权（道之光特色）
+ * 4. 月令加权（道之自然特色）
  * 
  * @param stems 天干数组 [年干, 月干, 日干, 时干]
  * @param branches 地支数组 [年支, 月支, 日支, 时支]

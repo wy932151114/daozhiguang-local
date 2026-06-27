@@ -1,5 +1,5 @@
 // ============================================================
-// 道之光核心协议 — 报告协议 (Report Protocol)
+// 道之自然核心协议 — 报告协议 (Report Protocol)
 // 
 // 所有AI报告的标准输出格式
 // 报告是 规则引擎结果 + AI语言组织 的产物
@@ -67,4 +67,4 @@ export interface DailyReportProtocol {
 
 /** 协议栈版本 */
 export const PROTOCOL_VERSION = '2.3';
-export const PROTOCOL_SOURCE = '《道之光·改命纪实录》';
+export const PROTOCOL_SOURCE = '《道之自然·改命纪实录》';

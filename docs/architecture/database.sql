@@ -1,5 +1,5 @@
 -- ============================================================
--- 道之光·命理系统 — 数据库设计
+-- 道之自然·命理系统 — 数据库设计
 -- MongoDB + PostgreSQL 混合架构
 -- 核心数据用 PostgreSQL（关系一致性强）
 -- 排盘缓存/日志/AI会话用 MongoDB（灵活）
@@ -202,7 +202,7 @@ CREATE TABLE classical_sources (
     chapter         VARCHAR(100),
     content         TEXT NOT NULL,
     translation     TEXT,                    -- 白话翻译
-    explanation     TEXT,                    -- 道之光风格解读
+    explanation     TEXT,                    -- 道之自然风格解读
     
     category        VARCHAR(20) CHECK (category IN ('八字', '风水', '择日', '五行', '命理', '综合')),
     wuxing_related  VARCHAR(10)[],          -- 相关五行
