@@ -3,7 +3,7 @@
 // 工作流执行引擎：拓扑排序、节点分发、执行记录管理
 // ============================================================
 
-import { Injectable, Logger, NotFoundException, BadRequestException } from '@nestjs/common';
+import { Injectable, Logger, NotFoundException, BadRequestException, Inject, forwardRef } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import { v4 as uuidv4 } from 'uuid';
@@ -30,6 +30,9 @@ import type {
   WorkflowExecutionData,
   WorkflowData,
 } from '../interface/workflow.interface';
+import { AIRuntimeService } from '@/modules/ai-runtime/ai-runtime.service';
+import { PromptCenterService } from '@/modules/prompt-center/services/prompt-center.service';
+import { ReportService } from '@/modules/report/domain/report.service';
 
 // ── 运行时上下文 ────────────────────────────────────────────────
 
@@ -108,6 +111,12 @@ export class WorkflowExecutorService {
     private readonly workflowModel: Model<WorkflowDocument>,
     @InjectModel(WorkflowExecution.name)
     private readonly executionModel: Model<WorkflowExecutionDocument>,
+    @Inject(forwardRef(() => AIRuntimeService))
+    private readonly aiRuntimeService: AIRuntimeService,
+    @Inject(forwardRef(() => PromptCenterService))
+    private readonly promptCenterService: PromptCenterService,
+    @Inject(forwardRef(() => ReportService))
+    private readonly reportService: ReportService,
   ) {}
 
   /* =================================================================
@@ -378,9 +387,7 @@ export class WorkflowExecutorService {
   }
 
   /**
-   * AI_RUNTIME — 调用 AI 生成
-   * 注意：此处理器应通过 forwardRef 注入 AIRuntimeService
-   * 当前使用占位实现，由 Facade 层协调
+   * AI_RUNTIME — 调用 AI 生成（真实调测链路）
    */
   private async handleAIRuntime(
     node: WorkflowNode,
@@ -394,18 +401,30 @@ export class WorkflowExecutorService {
     // 输入变量替换
     const resolvedPrompt = this.resolveTemplate(systemPrompt, context.variables);
 
-    // 占位：实际调用通过 Facade/回调注入
-    // 被 workflow.service.ts 替换为真实 AIRuntimeService.generate() 调用
-    context.variables[`${node.nodeId}_output`] = {
-      content: `[AI_RUNTIME placeholder] ${resolvedPrompt}`,
+    // 真实调用 AIRuntimeService.generate()
+    const userId = (context.input?.userId as string) ?? 'workflow';
+    const result = await this.aiRuntimeService.generate(userId, {
+      messages: [
+        { role: 'system', content: resolvedPrompt || 'You are a helpful assistant.' },
+        { role: 'user', content: `Process workflow input: ${JSON.stringify(context.variables)}` },
+      ],
       model,
       provider,
+      temperature: (config.temperature as number) ?? 0.7,
+      maxTokens: (config.maxTokens as number) ?? 2048,
+    });
+
+    context.variables[`${node.nodeId}_output`] = {
+      content: result.content ?? JSON.stringify(result),
+      model: result.model ?? model,
+      provider: result.provider ?? provider,
+      tokenUsage: result.usage,
       nodeId: node.nodeId,
     };
   }
 
   /**
-   * PROMPT — 从 Prompt Center 获取模板并渲染
+   * PROMPT — 从 Prompt Center 获取模板并渲染（真实调测链路）
    */
   private async handlePrompt(
     node: WorkflowNode,
@@ -418,17 +437,23 @@ export class WorkflowExecutorService {
       throw new Error(`PROMPT node "${node.nodeId}" has no promptId configured`);
     }
 
-    // 占位：实际通过 Facade 注入 PromptCenterService.render()
+    // 从 Prompt Center 获取并渲染
+    const result = await this.promptCenterService.render({
+      promptId,
+      version: (config.version as string) ?? undefined,
+      variables: context.variables as Record<string, string>,
+    });
+
     context.variables[`${node.nodeId}_output`] = {
       promptId,
-      rendered: `[PROMPT placeholder] promptId=${promptId}`,
+      rendered: result.systemMessage || JSON.stringify(result.messages),
       variables: { ...context.variables },
       nodeId: node.nodeId,
     };
   }
 
   /**
-   * REPORT — 生成报告
+   * REPORT — 生成报告（真实调测链路）
    */
   private async handleReport(
     node: WorkflowNode,
@@ -436,6 +461,7 @@ export class WorkflowExecutorService {
   ): Promise<void> {
     const config = node.config ?? {};
     const format = (config.format as string) ?? 'markdown';
+    const reportType = (config.reportType as string) ?? 'bazi-analysis';
 
     // 收集所有前置节点的输出
     const collectedOutputs: Record<string, unknown> = {};
@@ -445,11 +471,22 @@ export class WorkflowExecutorService {
       }
     }
 
-    // 占位：实际通过 Facade 调用 ReportService.create()
+    // 真实调用 ReportService.create() 创建报告
+    const userId = (context.input?.userId as string) ?? 'workflow';
+    const report = await this.reportService.create(userId, {
+      type: reportType as any,
+      baziData: { ...context.variables } as any,
+      context: { workflowId: context.workflowId, executionId: context.executionId, nodeResults: Array.from(context.nodeResults.keys()) },
+      promptId: config.promptId as string,
+      promptVersion: config.version as string,
+      provider: config.provider as string,
+      model: config.model as string,
+    });
+
     context.variables[`${node.nodeId}_output`] = {
       format,
       collectedOutputs,
-      reportId: `[REPORT placeholder]`,
+      reportId: report.reportId,
       nodeId: node.nodeId,
     };
   }
@@ -526,19 +563,35 @@ export class WorkflowExecutorService {
     // 替换 URL 中的 {{variable}} 占位符
     const resolvedUrl = this.resolveTemplate(url, context.variables);
 
-    // 占位：实际通过 Facade 使用 fetch/axios 发起 HTTP 请求
-    // 返回占位结果
-    context.variables[`${node.nodeId}_output`] = {
-      url: resolvedUrl,
-      method,
-      statusCode: 200,
-      body: `[HTTP placeholder] ${method} ${resolvedUrl}`,
-      nodeId: node.nodeId,
-    };
+    // 真实 HTTP 请求
+    try {
+      const fetchOptions: RequestInit & { body?: string } = {
+        method,
+        headers: { ...headers, 'Content-Type': 'application/json' },
+        signal: AbortSignal.timeout(30000),
+      };
+      if (body && method !== 'GET' && method !== 'HEAD') {
+        fetchOptions.body = JSON.stringify(body);
+      }
+
+      const response = await fetch(resolvedUrl, fetchOptions);
+      const responseBody = await response.text();
+
+      context.variables[`${node.nodeId}_output`] = {
+        url: resolvedUrl,
+        method,
+        statusCode: response.status,
+        statusText: response.statusText,
+        body: responseBody.substring(0, 50000), // 截取防止过大
+        nodeId: node.nodeId,
+      };
+    } catch (err) {
+      throw new Error(`HTTP node "${node.nodeId}": ${(err as Error).message}`);
+    }
   }
 
   /**
-   * DATABASE — 查询/写入数据库
+   * DATABASE — 查询/写入数据库（真实 MongoDB 操作）
    */
   private async handleDatabase(
     node: WorkflowNode,
@@ -548,13 +601,48 @@ export class WorkflowExecutorService {
     const operation = (config.operation as string) ?? 'query';
     const collection = (config.collection as string) ?? '';
 
-    // 占位：实际由 Facade 层注入数据库服务
-    context.variables[`${node.nodeId}_output`] = {
-      operation,
-      collection,
-      result: `[DATABASE placeholder] ${operation} on ${collection}`,
-      nodeId: node.nodeId,
-    };
+    if (!collection) {
+      throw new Error(`DATABASE node "${node.nodeId}" has no collection configured`);
+    }
+
+    try {
+      const db = this.workflowModel.db;
+      const coll = db.collection(collection);
+      const query = config.query as Record<string, any> ?? {};
+      let result: any;
+
+      switch (operation) {
+        case 'query':
+          result = await coll.find(query).limit(50).toArray();
+          break;
+        case 'findOne':
+          result = await coll.findOne(query);
+          break;
+        case 'insert':
+          result = await coll.insertOne(config.document as Record<string, any> ?? {});
+          break;
+        case 'update':
+          result = await coll.updateOne(query, { $set: config.update as Record<string, any> ?? {} });
+          break;
+        case 'delete':
+          result = await coll.deleteOne(query);
+          break;
+        case 'count':
+          result = { count: await coll.countDocuments(query) };
+          break;
+        default:
+          result = await coll.find(query).limit(10).toArray();
+      }
+
+      context.variables[`${node.nodeId}_output`] = {
+        operation,
+        collection,
+        result,
+        nodeId: node.nodeId,
+      };
+    } catch (err) {
+      throw new Error(`DATABASE node "${node.nodeId}": ${(err as Error).message}`);
+    }
   }
 
   /**
