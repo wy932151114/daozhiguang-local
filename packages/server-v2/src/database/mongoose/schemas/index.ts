@@ -10,3 +10,21 @@ export { AITokenLog, AITokenLogSchema } from './ai-token-log.schema';
 export { AILog, AILogSchema } from './ai-log.schema';
 export { Prompt, PromptSchema } from './prompt.schema';
 export { PromptVersion, PromptVersionSchema } from './prompt-version.schema';
+export {
+  Workflow,
+  WorkflowSchema,
+  WorkflowNodeType,
+  WorkflowStatus,
+  WorkflowNode,
+  WorkflowEdge,
+} from './workflow.schema';
+export {
+  WorkflowExecution,
+  WorkflowExecutionSchema,
+  ExecutionStatus,
+  NodeResultStatus,
+  LogLevel,
+  WorkflowNodeResult,
+  WorkflowLog,
+} from './workflow-execution.schema';
+export { WorkflowTemplate, WorkflowTemplateSchema } from './workflow-template.schema';

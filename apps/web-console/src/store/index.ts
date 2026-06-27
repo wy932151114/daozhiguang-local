@@ -191,3 +191,8 @@ export const useCVStore = create<CVState>((set) => ({
   setLoading: (v) => set({ loading: v }),
   setError: (e) => set({ error: e }),
 }));
+
+// ============================================================
+// Workflow 状态
+// ============================================================
+export { useWorkflowStore } from './workflow';

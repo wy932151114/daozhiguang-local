@@ -133,3 +133,238 @@ export function useValidationQuery() {
     refetchInterval: 30000,
   });
 }
+
+// ============================================================
+// Workflow — React Query Hooks
+// ============================================================
+
+const getAuthHeaders = (): Record<string, string> => {
+  const token = typeof window !== 'undefined' ? localStorage.getItem('dzs_v2_token') : null;
+  const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+  if (token) headers['Authorization'] = `Bearer ${token}`;
+  return headers;
+};
+
+async function fetchWithAuth<T>(url: string, options?: RequestInit): Promise<T> {
+  const res = await fetch(url, { ...options, headers: { ...getAuthHeaders(), ...options?.headers } });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data?.message || data?.error || `请求失败 ${res.status}`);
+  return data;
+}
+
+// ── Query Keys ──
+export const workflowKeys = {
+  all: ['workflows'] as const,
+  list: (query?: string) => ['workflows', 'list', query] as const,
+  detail: (id: string) => ['workflows', id] as const,
+  stats: ['workflows', 'stats'] as const,
+  executions: (workflowId?: string) => ['workflows', 'executions', workflowId] as const,
+  templates: ['workflows', 'templates'] as const,
+};
+
+// ── Types ──
+export interface WorkflowListItem {
+  workflowId: string;
+  name: string;
+  description?: string;
+  category?: string;
+  tags?: string[];
+  version: string;
+  status: 'draft' | 'active' | 'paused' | 'archived';
+  nodeCount?: number;
+  createdBy?: string;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface WorkflowDetail {
+  workflowId: string;
+  name: string;
+  description?: string;
+  category?: string;
+  tags?: string[];
+  version: string;
+  status: 'draft' | 'active' | 'paused' | 'archived';
+  nodes: any[];
+  edges: any[];
+  variables?: string[];
+  createdBy?: string;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface WorkflowStats {
+  total: number;
+  active: number;
+  draft: number;
+  paused: number;
+  archived: number;
+  executionsToday: number;
+  successRate: number;
+}
+
+export interface WorkflowExecution {
+  executionId: string;
+  workflowId: string;
+  workflowName: string;
+  status: string;
+  startedAt?: string;
+  completedAt?: string;
+  durationMs?: number;
+  triggeredBy: string;
+  input: Record<string, any>;
+  output?: Record<string, any>;
+  error?: string;
+}
+
+export interface WorkflowTemplate {
+  templateId: string;
+  name: string;
+  description?: string;
+  category?: string;
+  nodeCount: number;
+  tags?: string[];
+}
+
+// ── Hooks: 列表 ──
+export function useWorkflows(query?: string) {
+  return useQuery({
+    queryKey: workflowKeys.list(query),
+    queryFn: async (): Promise<WorkflowListItem[]> => {
+      const params = query ? `?q=${encodeURIComponent(query)}` : '?limit=100';
+      const data = await fetchWithAuth<any>(`/api/v2/workflows${params}`);
+      if (data?.workflows) return data.workflows;
+      if (Array.isArray(data)) return data;
+      return [];
+    },
+  });
+}
+
+// ── Hooks: 详情 ──
+export function useWorkflow(workflowId: string) {
+  return useQuery({
+    queryKey: workflowKeys.detail(workflowId),
+    queryFn: async (): Promise<WorkflowDetail | null> => {
+      const data = await fetchWithAuth<any>(`/api/v2/workflows/${workflowId}`);
+      return data?.workflow || data || null;
+    },
+    enabled: !!workflowId,
+  });
+}
+
+// ── Hooks: 统计 ──
+export function useWorkflowStats() {
+  return useQuery({
+    queryKey: workflowKeys.stats,
+    queryFn: async (): Promise<WorkflowStats | null> => {
+      const data = await fetchWithAuth<any>('/api/v2/workflows/stats');
+      return data?.stats || data || null;
+    },
+  });
+}
+
+// ── Hooks: 模板列表 ──
+export function useWorkflowTemplates() {
+  return useQuery({
+    queryKey: workflowKeys.templates,
+    queryFn: async (): Promise<WorkflowTemplate[]> => {
+      const data = await fetchWithAuth<any>('/api/v2/workflows/templates');
+      if (data?.templates) return data.templates;
+      if (Array.isArray(data)) return data;
+      return [];
+    },
+  });
+}
+
+// ── Mutations ──
+
+// 创建工作流
+export function useCreateWorkflow() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (input: { name: string; description?: string; category?: string; tags?: string[] }) => {
+      return fetchWithAuth<any>('/api/v2/workflows', {
+        method: 'POST',
+        body: JSON.stringify(input),
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: workflowKeys.all });
+    },
+  });
+}
+
+// 保存工作流
+export function useSaveWorkflow() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ workflowId, ...data }: { workflowId: string; name?: string; description?: string; nodes?: any[]; edges?: any[]; variables?: string[]; status?: string }) => {
+      return fetchWithAuth<any>(`/api/v2/workflows/${workflowId}`, {
+        method: 'PUT',
+        body: JSON.stringify(data),
+      });
+    },
+    onSuccess: (_data, vars) => {
+      queryClient.invalidateQueries({ queryKey: workflowKeys.all });
+      queryClient.invalidateQueries({ queryKey: workflowKeys.detail(vars.workflowId) });
+    },
+  });
+}
+
+// 删除工作流
+export function useDeleteWorkflow() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (workflowId: string) => {
+      return fetchWithAuth<any>(`/api/v2/workflows/${workflowId}`, { method: 'DELETE' });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: workflowKeys.all });
+    },
+  });
+}
+
+// 执行工作流
+export function useExecuteWorkflow() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ workflowId, input }: { workflowId: string; input?: Record<string, any> }) => {
+      return fetchWithAuth<any>(`/api/v2/workflows/${workflowId}/execute`, {
+        method: 'POST',
+        body: JSON.stringify({ input: input || {} }),
+      });
+    },
+    onSuccess: (_data, vars) => {
+      queryClient.invalidateQueries({ queryKey: workflowKeys.executions(vars.workflowId) });
+    },
+  });
+}
+
+// 停止工作流执行
+export function useStopWorkflow() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ workflowId, executionId }: { workflowId: string; executionId: string }) => {
+      return fetchWithAuth<any>(`/api/v2/workflows/${workflowId}/executions/${executionId}/stop`, {
+        method: 'POST',
+      });
+    },
+    onSuccess: (_data, vars) => {
+      queryClient.invalidateQueries({ queryKey: workflowKeys.executions(vars.workflowId) });
+    },
+  });
+}
+
+// ── Hooks: 执行记录 ──
+export function useWorkflowExecutions(workflowId: string) {
+  return useQuery({
+    queryKey: workflowKeys.executions(workflowId),
+    queryFn: async (): Promise<WorkflowExecution[]> => {
+      const data = await fetchWithAuth<any>(`/api/v2/workflows/${workflowId}/executions?limit=50`);
+      if (data?.executions) return data.executions;
+      if (Array.isArray(data)) return data;
+      return [];
+    },
+    enabled: !!workflowId,
+  });
+}

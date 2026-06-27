@@ -9,6 +9,7 @@ export const SWAGGER_TAGS = {
   HEALTH: 'Health',
   AI_RUNTIME: 'AI Runtime',
   PROMPT_CENTER: 'Prompt Center',
+  WORKFLOW_ENGINE: 'Workflow Engine',
 } as const;
 
 /** Swagger API 安全定义 */

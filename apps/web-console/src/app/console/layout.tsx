@@ -5,7 +5,7 @@ import { usePathname } from 'next/navigation';
 import { cn } from '@/lib/utils';
 import {
   LayoutDashboard, Cpu, Wind, Grid3X3, Brain, Scan,
-  FileText, Server, MessageSquareCode,
+  FileText, Server, MessageSquareCode, Workflow,
 } from 'lucide-react';
 import { useEffect } from 'react';
 import { useSystemStore, useBaziStore } from '@/store';
@@ -18,6 +18,7 @@ const NAV_ITEMS = [
   { href: '/console/ai-debug', label: 'AI调试', icon: Brain, color: '#9B59B6' },
   { href: '/console/cv-scan', label: 'CV扫描', icon: Scan, color: '#1ABC9C' },
   { href: '/console/ai-runtime', label: 'AI Runtime', icon: Server, color: '#8B5CF6' },
+  { href: '/console/workflow', label: 'Workflow Center', icon: Workflow, color: '#06b6d4' },
   { href: '/console/prompt-center', label: 'Prompt Center', icon: MessageSquareCode, color: '#f59e0b' },
   { href: '/console/report', label: 'AI报告中心', icon: FileText, color: '#F39C12' },
 ];

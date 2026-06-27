@@ -13,6 +13,7 @@ import { UserModule } from '@/modules/user/user.module';
 import { ReportModule } from '@/modules/report/report.module';
 import { AIRuntimeModule } from '@/modules/ai-runtime/ai-runtime.module';
 import { PromptCenterModule } from '@/modules/prompt-center/prompt-center.module';
+import { WorkflowModule } from '@/modules/workflow/workflow.module';
 
 // Guards
 import { JwtAuthGuard } from '@/common/guards/jwt-auth.guard';
@@ -43,6 +44,7 @@ import { AllExceptionsFilter } from '@/common/filters/all-exceptions.filter';
     ReportModule,
     AIRuntimeModule,
     PromptCenterModule,
+    WorkflowModule,
   ],
   providers: [
     { provide: APP_GUARD, useClass: JwtAuthGuard },

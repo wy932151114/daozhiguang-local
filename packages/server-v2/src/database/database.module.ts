@@ -12,6 +12,9 @@ import {
   AILog, AILogSchema,
   Prompt, PromptSchema,
   PromptVersion, PromptVersionSchema,
+  Workflow, WorkflowSchema,
+  WorkflowExecution, WorkflowExecutionSchema,
+  WorkflowTemplate, WorkflowTemplateSchema,
 } from './mongoose/schemas';
 
 const featureModules = [
@@ -26,6 +29,9 @@ const featureModules = [
     { name: AILog.name, schema: AILogSchema },
     { name: Prompt.name, schema: PromptSchema },
     { name: PromptVersion.name, schema: PromptVersionSchema },
+    { name: Workflow.name, schema: WorkflowSchema },
+    { name: WorkflowExecution.name, schema: WorkflowExecutionSchema },
+    { name: WorkflowTemplate.name, schema: WorkflowTemplateSchema },
   ]),
 ];
 
