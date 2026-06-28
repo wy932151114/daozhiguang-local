@@ -5,7 +5,8 @@
 import {
   Controller, Post, Get, Delete,
   Body, Param, Query, HttpCode, HttpStatus,
-  UseGuards, Header, Res,
+  UseGuards, Header, Res, Logger, StreamableFile,
+  NotFoundException,
 } from '@nestjs/common';
 import {
   ApiTags, ApiOperation, ApiResponse, ApiBearerAuth,
@@ -25,6 +26,8 @@ import {
 @ApiBearerAuth('JWT-auth')
 @Controller('v2/report')
 export class ReportController {
+  private readonly logger = new Logger(ReportController.name);
+
   constructor(private readonly report: ReportService) {}
 
   @Post('generate')
@@ -119,13 +122,35 @@ export class ReportController {
   async exportPdf(
     @CurrentUser('id') userId: string,
     @Body() dto: ExportReportDto,
-    @Res() res: Response,
+  ): Promise<StreamableFile> {
+    const pdfBase64 = await this.report.exportReport(userId, dto.reportId, 'pdf');
+    if (!pdfBase64 || pdfBase64.length < 10) {
+      throw new NotFoundException(`PDF base64 too short: len=${pdfBase64?.length}`);
+    }
+    const pdfBuffer = Buffer.from(pdfBase64, 'base64');
+    return new StreamableFile(pdfBuffer, {
+      type: 'application/pdf',
+      disposition: `attachment; filename="report-${dto.reportId}.pdf"`,
+      length: pdfBuffer.length,
+    });
+  }
+
+  /** 诊断：返回PDF的详情（非二进制） */
+  @Post('export/pdf-debug')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'PDF诊断' })
+  async exportPdfDebug(
+    @CurrentUser('id') userId: string,
+    @Body() dto: ExportReportDto,
   ) {
     const pdfBase64 = await this.report.exportReport(userId, dto.reportId, 'pdf');
-    const pdfBuffer = Buffer.from(pdfBase64, 'base64');
-    res.setHeader('Content-Disposition', `attachment; filename="report-${dto.reportId}.pdf"`);
-    res.setHeader('Content-Length', pdfBuffer.length);
-    res.end(pdfBuffer);
+    return {
+      base64Len: pdfBase64?.length || 0,
+      base64First50: pdfBase64?.substring(0, 50),
+      base64Last20: pdfBase64?.substring(pdfBase64.length - 20),
+      decodedLen: pdfBase64 ? Buffer.from(pdfBase64, 'base64').length : 0,
+      startsWithPdf: pdfBase64?.startsWith('JVBERi0'),
+    };
   }
 
   @Post('export/markdown')

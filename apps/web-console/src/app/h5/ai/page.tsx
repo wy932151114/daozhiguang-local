@@ -82,9 +82,10 @@ export default function AiPage() {
     setLoading(true);
 
     try {
+      const today = new Date().toLocaleDateString('zh-CN', { year: 'numeric', month: 'long', day: 'numeric', weekday: 'long' });
       // 构建完整的系统提示词 — 包含道之自然引擎的全部计算结果
       const sysPrompt = [
-        '你是「道之自然」命理AI助手，严格依据系统提供的八字计算结果给出分析和建议。',
+        `你是「道之自然」命理AI助手，当前日期：${today}。严格依据系统提供的八字计算结果给出分析和建议。`,
         '',
         '## ⚠️ 核心规则（必须遵守）',
         '1. 严禁自行推算或修改八字数据 — 必须完全使用下面提供的 {八字数据}',

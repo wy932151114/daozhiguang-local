@@ -128,9 +128,10 @@ export class ExportReportDto {
   @IsNotEmpty()
   reportId: string;
 
-  @ApiProperty({ enum: ExportFormat, description: '导出格式' })
+  @ApiProperty({ enum: ExportFormat, description: '导出格式（可选，路由已确定格式）', required: false })
+  @IsOptional()
   @IsEnum(ExportFormat)
-  format: ExportFormat;
+  format?: ExportFormat;
 }
 
 /** 批量删除请求 */

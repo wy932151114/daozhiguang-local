@@ -11,8 +11,7 @@ import { RenderContext, RenderResult, RenderOptions, RendererMeta } from './type
  * PDFReportRenderer — 将报告渲染为 PDF 格式
  *
  * 基于 HTML 渲染结果 + puppeteer 无头浏览器转换为 PDF。
- * 实际执行时需依赖 puppeteer 或 puppeteer-core 包。
- * 若运行时未安装，将回退为仅生成 HTML 并提示安装。
+ * 使用动态 import() 加载 puppeteer-core（ESM 包，不支持 require）。
  */
 export class PDFReportRenderer implements IReportRenderer {
   readonly meta: RendererMeta = {
@@ -27,79 +26,27 @@ export class PDFReportRenderer implements IReportRenderer {
   /** 内部 HTML 渲染委托 */
   private htmlRenderer: HTMLReportRenderer;
 
-  /** Puppeteer 是否可用 */
-  private puppeteerAvailable: boolean | null = null;
-
   constructor() {
     this.htmlRenderer = new HTMLReportRenderer();
   }
 
   async render(context: RenderContext, options?: RenderOptions): Promise<RenderResult> {
     const startTime = Date.now();
-    const available = await this.checkPuppeteer();
 
-    if (!available) {
-      // Fallback: 返回 HTML 结果，标注需要 puppeteer
-      const htmlResult = await this.htmlRenderer.render(context, options);
-      return {
-        ...htmlResult,
-        content: `<!-- ============================================\n${'注意：PDF 渲染需要 puppeteer 依赖，以下为 HTML 回退内容'}\n============================================ -->\n\n${htmlResult.content}`,
-        format: ExportFormat.PDF,
-        size: htmlResult.size,
-        duration: Date.now() - startTime,
-        mimeType: this.getMimeType(),
-      };
-    }
-
-    // 正常 PDF 渲染路径
+    // 先生成HTML内容
     const htmlContent = (await this.htmlRenderer.render(context, options)).content;
-    const pdfBuffer = await this.htmlToPdf(htmlContent, options);
-    const pdfContent = pdfBuffer.toString('base64');
 
-    return {
-      content: pdfContent,
-      format: ExportFormat.PDF,
-      size: pdfBuffer.length,
-      duration: Date.now() - startTime,
-      mimeType: this.getMimeType(),
-    };
-  }
-
-  /**
-   * 检查 puppeteer-core 是否可用（使用系统 Chrome）
-   */
-  private async checkPuppeteer(): Promise<boolean> {
-    if (this.puppeteerAvailable !== null) return this.puppeteerAvailable;
-    try {
-      await import('puppeteer-core');
-      this.puppeteerAvailable = true;
-    } catch {
-      this.puppeteerAvailable = false;
-    }
-    return this.puppeteerAvailable;
-  }
-
-  /**
-   * 获取系统 Chrome 的可执行路径
-   */
-  private getChromeExecutablePath(): string {
-    return '/usr/bin/google-chrome-stable';
-  }
-
-  /**
-   * 使用 puppeteer 将 HTML 转为 PDF Buffer
-   */
-  private async htmlToPdf(html: string, options?: RenderOptions): Promise<Buffer> {
-    const puppeteer = await import('puppeteer-core');
+    // 使用 puppeteer 生成 PDF（eval 绕过 TS 对 import() 的 commonjs 编译）
+    const puppeteer: any = await eval('import("puppeteer-core")');
     const browser = await puppeteer.launch({
       headless: true,
-      executablePath: this.getChromeExecutablePath(),
+      executablePath: '/usr/bin/google-chrome-stable',
       args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage'],
     });
 
     try {
       const page = await browser.newPage();
-      await page.setContent(html, { waitUntil: 'networkidle2' as any });
+      await page.setContent(htmlContent, { waitUntil: 'networkidle2' as any });
 
       const pdfOpts = options?.pdfOptions ?? {};
       const pdfBuffer = await page.pdf({
@@ -112,14 +59,21 @@ export class PDFReportRenderer implements IReportRenderer {
         footerTemplate: '<div style="font-size:9px;color:#999;padding:10px;width:100%;text-align:center;"><span class="pageNumber"></span> / <span class="totalPages"></span></div>',
       });
 
-      return Buffer.from(pdfBuffer);
+      const pdfContent = Buffer.from(pdfBuffer).toString('base64');
+
+      return {
+        content: pdfContent,
+        format: ExportFormat.PDF,
+        size: pdfBuffer.length,
+        duration: Date.now() - startTime,
+        mimeType: this.getMimeType(),
+      };
     } finally {
       await browser.close();
     }
   }
 
   async toBuffer(content: string): Promise<Buffer> {
-    // Base64 编码的 PDF 内容
     return Buffer.from(content, 'base64');
   }
 
