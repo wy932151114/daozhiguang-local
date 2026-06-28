@@ -10,6 +10,7 @@ export const SWAGGER_TAGS = {
   AI_RUNTIME: 'AI Runtime',
   PROMPT_CENTER: 'Prompt Center',
   WORKFLOW_ENGINE: 'Workflow Engine',
+  PROVIDER_CONFIG: 'Provider Config',
 } as const;
 
 /** Swagger API 安全定义 */

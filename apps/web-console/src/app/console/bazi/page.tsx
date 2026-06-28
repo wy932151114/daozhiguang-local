@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useBaziStore } from '@/store';
 import { calculateBazi, type BaziResult } from '@/lib/api';
 import { useBaziMutation } from '@/lib/hooks/queries';
@@ -35,7 +35,7 @@ export default function BaziPage() {
     try {
       const res = await calculateBazi(input);
       if (res.success) {
-        setResult(res.data); // ✅ 正确提取 .data
+        setResult(res.data);
         generateInterpretation(res.data);
       } else {
         setError('计算失败：服务端返回错误');
@@ -47,16 +47,49 @@ export default function BaziPage() {
     }
   };
 
+  // 从 sessionStorage 恢复八字输入数据到表单
+  const [restored, setRestored] = useState(false);
+  useEffect(() => {
+    if (restored) return;
+    try {
+      const raw = sessionStorage.getItem('dzs_bazi_input');
+      if (raw) {
+        const bd = JSON.parse(raw);
+        setInput({
+          year: bd.year || 1990,
+          month: bd.month || 1,
+          day: bd.day || 1,
+          hour: bd.hour ?? 12,
+          minute: bd.minute ?? 0,
+          gender: bd.gender || 'male',
+          birthPlace: bd.birthPlace || '',
+          longitude: bd.longitude || 120,
+          useTrueSolar: bd.useTrueSolar ?? true,
+        });
+        setRestored(true);
+        // 触发自动计算（用 setTimeout 避免闭包问题）
+        setTimeout(() => handleCalculate(), 0);
+      } else {
+        setRestored(true);
+      }
+    } catch {
+      setRestored(true);
+    }
+  }, []);
+
   // AI 解读（基于引擎数据，非mock）
   const generateInterpretation = (bazi: BaziResult) => {
     const dm = bazi.dayMaster;
+    // dayMasterElement 可能位于顶层或 strength 对象中
+    const dmEl = bazi.dayMasterElement || (bazi.strength as any)?.dayMasterElement || 'water';
+    const dmName = WUXING_NAMES[dmEl] || WUXING_NAMES[dmEl as keyof typeof WUXING_NAMES] || '水';
     const ys = bazi.usefulGod?.yongShen?.join('、') || '火';
     const js = bazi.usefulGod?.jiShen?.join('、') || '水';
     const st = bazi.strength?.bodyStrength || '中和';
-    setAiInterpretation(`【日主${dm}${WUXING_NAMES[bazi.dayMasterElement] || '土'} · ${st}】
+    setAiInterpretation(`【日主${dm}${dmName} · ${st}】
 
 命局分析：
-日主为${dm}${WUXING_NAMES[bazi.dayMasterElement] || '土'}，生于${bazi.pillars.month.full}月，五行分布为金${bazi.elementBalance.percentage.金}%、木${bazi.elementBalance.percentage.木}%、水${bazi.elementBalance.percentage.水}%、火${bazi.elementBalance.percentage.火}%、土${bazi.elementBalance.percentage.土}%。
+日主为${dm}${dmName}，生于${bazi.pillars.month.full}月，五行分布为金${bazi.elementBalance.percentage.金}%、木${bazi.elementBalance.percentage.木}%、水${bazi.elementBalance.percentage.水}%、火${bazi.elementBalance.percentage.火}%、土${bazi.elementBalance.percentage.土}%。
 
 ${st === '身弱' ? '日主偏弱，需印星（火）生扶、比劫（土）相助。' : st === '身强' ? '日主较强，宜食伤（金）泄秀、官杀（木）制身。' : '五行能量较为均衡，顺势而为即可。'}
 

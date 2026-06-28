@@ -5,22 +5,25 @@ import { usePathname } from 'next/navigation';
 import { cn } from '@/lib/utils';
 import {
   LayoutDashboard, Cpu, Wind, Grid3X3, Brain, Scan,
-  FileText, Server, MessageSquareCode, Workflow,
+  FileText, Server, MessageSquareCode, Workflow, Settings,
 } from 'lucide-react';
 import { useEffect } from 'react';
 import { useSystemStore, useBaziStore } from '@/store';
+import { useAuthStore } from '@/store/auth';
+import { useQueryClient } from '@tanstack/react-query';
 
 const NAV_ITEMS = [
-  { href: '/console/dashboard', label: 'Dashboard', icon: LayoutDashboard, color: '#f59e0b' },
+  { href: '/console/dashboard', label: '仪表盘', icon: LayoutDashboard, color: '#f59e0b' },
   { href: '/console/bazi', label: '八字排盘', icon: Cpu, color: '#2ECC71' },
   { href: '/console/wuxing', label: '五行能量', icon: Wind, color: '#E74C3C' },
   { href: '/console/jiugong', label: '九宫飞星', icon: Grid3X3, color: '#3498DB' },
   { href: '/console/ai-debug', label: 'AI调试', icon: Brain, color: '#9B59B6' },
   { href: '/console/cv-scan', label: 'CV扫描', icon: Scan, color: '#1ABC9C' },
-  { href: '/console/ai-runtime', label: 'AI Runtime', icon: Server, color: '#8B5CF6' },
-  { href: '/console/workflow', label: 'Workflow Center', icon: Workflow, color: '#06b6d4' },
-  { href: '/console/prompt-center', label: 'Prompt Center', icon: MessageSquareCode, color: '#f59e0b' },
+  { href: '/console/ai-runtime', label: 'AI运行引擎', icon: Server, color: '#8B5CF6' },
+  { href: '/console/workflow', label: '工作流引擎', icon: Workflow, color: '#06b6d4' },
+  { href: '/console/prompt-center', label: '提示词中心', icon: MessageSquareCode, color: '#f59e0b' },
   { href: '/console/report', label: 'AI报告中心', icon: FileText, color: '#F39C12' },
+  { href: '/console/provider-config', label: 'AI服务配置', icon: Settings, color: '#f59e0b' },
 ];
 
 import { ConsoleGate } from '@/lib/console-gate';
@@ -29,6 +32,7 @@ export default function ConsoleLayout({ children }: { children: React.ReactNode 
   const pathname = usePathname();
   const { isConnected, setConnected } = useSystemStore();
   const baziStore = useBaziStore();
+  const queryClient = useQueryClient();
 
   useEffect(() => {
     setConnected(true);
@@ -47,6 +51,33 @@ export default function ConsoleLayout({ children }: { children: React.ReactNode 
         }
       } catch {}
     }
+  }, []);
+
+  // 自动 JWT 游客登录（所有控制台页面共享）
+  useEffect(() => {
+    const token = useAuthStore.getState().token;
+    if (token) return;
+    fetch('/api/v2/auth/guest', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+    })
+      .then((r) => r.json())
+      .then((data) => {
+        if (data.accessToken) {
+          localStorage.setItem('dzs_v2_token', data.accessToken);
+          localStorage.setItem('dzs_v2_refresh', data.refreshToken || '');
+          localStorage.setItem('dzs_v2_user', JSON.stringify(data.user || {}));
+          useAuthStore.getState().setToken(
+            data.accessToken,
+            data.refreshToken || '',
+            data.user || { id: '', nickname: 'Guest', role: 'user', isGuest: true },
+          );
+          // 登录完成后立即刷新 Provider Config 等需要认证的数据
+          queryClient.invalidateQueries({ queryKey: ['provider-config'] });
+          queryClient.refetchQueries({ queryKey: ['provider-config'] });
+        }
+      })
+      .catch(() => {});
   }, []);
 
   return (

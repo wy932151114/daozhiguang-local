@@ -1,71 +1,46 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
-import { ArrowLeft, Send, Sparkles, Loader2, PlusCircle } from 'lucide-react';
-import { generateAI } from '@/lib/api';
 import { useRouter } from 'next/navigation';
+import { ArrowLeft, Sparkles, PlusCircle, Send } from 'lucide-react';
+import { generateAI } from '@/lib/api';
 
-const SUGGESTIONS = [
-  { icon: '📊', text: '分析我的五行能量' },
-  { icon: '🧭', text: '今日最佳方位' },
-  { icon: '🎯', text: '事业财运建议' },
-  { icon: '💕', text: '感情运势分析' },
-  { icon: '🏠', text: '居家风水建议' },
-  { icon: '⏰', text: '近期吉日时辰' },
-];
+// ✨ 辅助：生成用户友好的八字摘要
+function buildBaziContext(bazi: any): string {
+  if (!bazi) return '';
+  const dm = bazi.dayMaster || bazi.dayMaster || '--';
+  const dmEl = bazi.dayMasterElement || '水';
+  const strength = bazi.strength?.bodyStrength || bazi.strength?.bodyStrength || '中和';
+  const ys = bazi.usefulGod?.yongShen || bazi.usefulGod?.yongShen || [];
+  const js = bazi.usefulGod?.jiShen || bazi.usefulGod?.jiShen || [];
+  const balance = bazi.elementBalance || bazi.elementBalance || {};
+  const pct = balance.percentage || {};
 
-// 本地fallback生成
-function generateLocalResponse(question: string, baziData: any): string {
-  const dm = baziData?.dayMaster || '未知';
-  const strength = baziData?.strength?.bodyStrength || '中和';
-  const yongShen = baziData?.usefulGod?.yongShen || [];
-  const jiShen = baziData?.usefulGod?.jiShen || [];
-  const missing = baziData?.usefulGod?.missing || [];
-  const excess = baziData?.usefulGod?.excess || [];
-  const percentages = (baziData?.elementBalance?.percentage || {}) as Record<string, number>;
-  const dominant = Object.entries(percentages).sort((a, b) => b[1] - a[1])[0]?.[0] || '火';
-  const weakest = Object.entries(percentages).sort((a, b) => a[1] - b[1])[0]?.[0] || '水';
-
-  if (question.includes('五行') || question.includes('能量')) {
-    const missingText = missing.length ? `缺失五行：${missing.join('、')}` : '五行齐全';
-    const excessText = excess.length ? `过旺五行：${excess.join('、')}` : '五行均衡';
-    return `【五行能量分析】\n\n您的日主为${dm}，命格${strength}。\n\n当前五行分布：\n${Object.entries(percentages).map(([k, v]) => `- ${k}：${v}%`).join('\n')}\n主导：${dominant} | 最弱：${weakest}\n\n${missingText}\n${excessText}\n\n用神：${yongShen.join('、')} | 忌神：${jiShen.join('、')}\n\n建议：日常多接触${yongShen.map((s: string) => { const dirMap: Record<string, string> = { '木': '东方·绿色', '火': '南方·红色', '土': '中央·黄色', '金': '西方·白色', '水': '北方·黑色' }; return dirMap[s] || s; }).join('、')}元素，有助于平衡命局能量。`;
-  }
-
-  if (question.includes('方位') || question.includes('方向')) {
-    const dirMap: Record<string, string> = { '木': '东', '火': '南', '土': '中', '金': '西', '水': '北' };
-    const bestDir = dirMap[yongShen[0]] || '南';
-    const avoidDir = dirMap[jiShen[0]] || '东';
-    return `【方位吉凶】\n\n基于您的八字命局：\n\n✅ 最佳方位：${bestDir}方（${yongShen[0] || '火'}能量）\n   - 利事业、谋事、求财\n   - 办公/卧室宜朝此方向\n\n⚠️ 避免方位：${avoidDir}方（${jiShen[0] || '木'}能量）\n   - 此方与您命局相克\n   - 重大决策避开此方\n\n当前时辰：建议在${['子', '丑', '寅', '卯', '辰', '巳', '午', '未', '申', '酉', '戌', '亥'][new Date().getHours() % 12]}时向${bestDir}方行重要事宜。`;
-  }
-
-  if (question.includes('事业') || question.includes('财运')) {
-    return `【事业财运建议】\n\n日主${dm} · ${strength}\n\n✨ 事业方向：\n${yongShen.includes('金') ? '- 金融、法律、机械、管理等金性行业\n- 宜发挥决断力和执行力' : ''}${yongShen.includes('水') ? '- 贸易、物流、传媒、旅游等水性行业\n- 宜发挥智慧和流动性' : ''}${yongShen.includes('火') ? '- 文化、教育、餐饮、互联网等火性行业\n- 宜发挥热情和创造力' : ''}${yongShen.includes('土') ? '- 房地产、建筑、农业等土性行业\n- 宜发挥稳定和包容力' : ''}${yongShen.includes('木') ? '- 教育、医疗、环保、设计等木性行业\n- 宜发挥成长力和创新力' : ''}\n\n💰 财运提示：\n- 正财运${strength === '身强' ? '较旺，宜进取' : '稳健，宜守成'}\n- 偏财不宜强求\n- ${yongShen[0]}属性月份财运较佳`;
-  }
-
-  if (question.includes('感情') || question.includes('姻缘')) {
-    return `【感情运势分析】\n\n日主${dm} · ${strength}\n\n感情特质：\n${['甲', '乙', '丙', '丁', '戊', '己', '庚', '辛', '壬', '癸'].includes(dm) ? `- ${dm}日主的人通常${dm === '甲' ? '正直坦率，有担当' : dm === '乙' ? '温柔细腻，善解人意' : dm === '丙' ? '热情开朗，善于表达' : dm === '丁' ? '内敛细腻，重感情' : dm === '戊' ? '稳重可靠，重实际' : dm === '己' ? '包容体贴，善协调' : dm === '庚' ? '果断直率，有原则' : dm === '辛' ? '细腻敏感，追求完美' : dm === '壬' ? '开朗大方，不拘小节' : '智慧通透，善变通'}` : ''}\n\n建议：\n- 用神${yongShen.join('、')}对应的方位和场合更容易遇到良缘\n- 感情中多${strength === '身弱' ? '付出和表达' : '倾听和包容'}\n- 忌神${jiShen.join('、')}属性的人/事需谨慎`;
-  }
-
-  if (question.includes('风水') || question.includes('居家') || question.includes('房间')) {
-    const dirMap: Record<string, string> = { '木': '东', '火': '南', '土': '中', '金': '西', '水': '北' };
-    return `【居家风水建议】\n\n命主日柱${dm} · ${strength}\n\n🏠 布局建议：\n1. 床位宜朝${dirMap[yongShen[0]] || '南'}方\n2. 办公桌宜面向${dirMap[yongShen[0]] || '南'}方\n3. 家中${dirMap[yongShen[0]] || '南'}方保持整洁明亮\n\n🎨 配色建议：\n- 主色调：${yongShen.map((s: string) => { const cMap: Record<string, string> = { '木': '绿色', '火': '红色', '土': '黄色', '金': '白色/金色', '水': '蓝色/黑色' }; return cMap[s] || s; }).join('、')}\n- 避免色：${jiShen.map((s: string) => { const cMap: Record<string, string> = { '木': '绿色', '火': '红色', '土': '黄色', '金': '白色/金色', '水': '蓝色/黑色' }; return cMap[s] || s; }).join('、')}\n\n🪴 摆件建议：\n${yongShen.includes('木') ? '- 绿植（富贵竹、发财树）' : ''}${yongShen.includes('火') ? '\n- 红色饰品、灯具' : ''}${yongShen.includes('土') ? '\n- 水晶、陶瓷摆件' : ''}${yongShen.includes('金') ? '\n- 金属摆件、铜钱' : ''}${yongShen.includes('水') ? '\n- 鱼缸、流水摆件' : ''}`;
-  }
-
-  if (question.includes('吉日') || question.includes('时辰') || question.includes('日子')) {
-    const now = new Date();
-    const days = ['日', '一', '二', '三', '四', '五', '六'];
-    const today = days[now.getDay()];
-    const goodHours = yongShen.includes('火') ? '巳时(9-11)、午时(11-13)' :
-      yongShen.includes('木') ? '寅时(3-5)、卯时(5-7)' :
-      yongShen.includes('金') ? '申时(15-17)、酉时(17-19)' :
-      yongShen.includes('水') ? '亥时(21-23)、子时(23-1)' :
-      yongShen.includes('土') ? '辰时(7-9)、戌时(19-21)' : '巳时(9-11)';
-    return `【近期吉时参考】\n\n今日：周${today}\n\n⏰ 吉时：${goodHours}\n\n适合在当前时段安排重要事宜。\n\n📅 建议避开：与忌神${jiShen.join('、')}对应的时辰。\n\n改运效果最好的时间段通常是用神对应的时辰。`;
-  }
-
-  return `【道之自然AI改命建议】\n\n您的日主为${dm}，命格${strength}。\n\n关于"${question.slice(0, 20)}..."：\n\n命理不是宿命，而是能量地图。知道自己的五行强弱、用神忌神，就能在关键节点做出更好的选择。\n\n核心建议：\n1. 善用用神（${yongShen.join('、')}）的力量\n2. 避开忌神（${jiShen.join('、')}）的干扰\n3. 平衡五行能量，顺势而为\n\n天道即是人道，修行就是修人。命运掌握在自己手中。`;
+  return JSON.stringify({
+    dayMaster: dm,
+    dayMasterElement: dmEl,  // 如 壬 → 水, 丙 → 火
+    bodyStrength: strength,   // 身强/身弱/中和
+    yongShen: ys,             // 用神
+    jiShen: js,               // 忌神
+    elementBalance: {
+      wood: pct.木 || 0, fire: pct.火 || 0, earth: pct.土 || 0,
+      metal: pct.金 || 0, water: pct.水 || 0,
+    },
+    pillars: bazi.pillars || bazi.pillars,
+    tenGods: bazi.tenGods || bazi.tenGods,     // 十神
+    nayan: bazi.pillars?.year?.nayin || null,
+  }, null, 2);
 }
+
+/** 快速建议按钮 */
+const SUGGESTIONS = [
+  { text: '今日运势', icon: '🔮' },
+  { text: '感情姻缘', icon: '💕' },
+  { text: '事业财运', icon: '💼' },
+  { text: '健康养生', icon: '🏥' },
+  { text: '学业考试', icon: '📚' },
+  { text: '择日出行', icon: '🚗' },
+];
 
 interface Message {
   role: 'user' | 'assistant';
@@ -81,10 +56,15 @@ export default function AiPage() {
   const [loading, setLoading] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
+  // 从首页排盘获取八字完整数据
   useEffect(() => {
     const stored = sessionStorage.getItem('dzs_bazi_result');
     if (stored) {
-      try { setBaziData(JSON.parse(stored)); } catch {}
+      try {
+        const parsed = JSON.parse(stored);
+        // 兼容两种格式：直接 result 或 { data: result }
+        setBaziData(parsed.data || parsed);
+      } catch {}
     }
   }, []);
 
@@ -102,22 +82,102 @@ export default function AiPage() {
     setLoading(true);
 
     try {
+      // 构建完整的系统提示词 — 包含道之自然引擎的全部计算结果
+      const sysPrompt = [
+        '你是「道之自然」命理AI助手，严格依据系统提供的八字计算结果给出分析和建议。',
+        '',
+        '## ⚠️ 核心规则（必须遵守）',
+        '1. 严禁自行推算或修改八字数据 — 必须完全使用下面提供的 {八字数据}',
+        '2. 日主+五行元素（如壬水、丙火）必须对应正确，不得写错',
+        '3. 所有命理分析必须基于系统已计算完成的用神、忌神、五行平衡',
+        '4. 用神和忌神是系统的精确计算结果，AI不得重新判断',
+        '5. 行文风格：简练、实用、有温度，体现道之自然的改命哲学',
+        '',
+        '## 道之自然·改命纪实录 核心规范',
+        '',
+        '### 认知框架',
+        '1. 命理是基础，改命是目的 — 禁止只做预测不提供解决方案',
+        '2. 五行生克是动态过程 — 必须结合流年、时辰、方位三重影响',
+        '',
+        '### 输出要求',
+        '1. 每条建议必须注明经典出处（如《改命纪实录》卷三）',
+        '2. 建议必须包含具体可执行的行动（时辰、方位、对应物品）',
+        '3. 标注效果周期（如：7日内见效）',
+        '',
+        '### 禁忌',
+        '1. 禁止"命中注定"等绝对化表述',
+        '2. 禁止单纯算命不提供解决方案',
+        '3. 操作建议必须简单到可立即执行',
+        '4. 避免纯理论，用生活化语言',
+        '',
+        '## 回答结构',
+        '- 先总结今日/当前的五行能量基调',
+        '- 基于八字的用神忌神给出具体行动建议',
+        '- 给出贴合实际的调整方案（颜色、方位、时辰等）',
+        '- 附可执行的具体小仪式或操作',
+        '',
+      ].join('\n');
+
       const res = await generateAI({
         type: 'daily',
         prompt: msg,
-        systemPrompt: '你是道之自然命理AI系统，基于八字命盘提供个性化改命建议。回答要简练、实用、有温度。',
-        baziData: baziData ? { pillars: baziData.pillars, dayMaster: baziData.dayMaster, usefulGod: baziData.usefulGod } : undefined,
+        systemPrompt: sysPrompt,
+        // 传递完整八字数据（不是只传部分字段）
+        baziData: baziData ? (() => {
+          const d = baziData;
+          return {
+            pillars: d.pillars || d.pillars,
+            dayMaster: d.dayMaster || d.dayMaster,
+            dayMasterElement: d.dayMasterElement || d.dayMasterElement,
+            usefulGod: d.usefulGod || d.usefulGod,
+            strength: d.strength || d.strength,
+            elementBalance: d.elementBalance || d.elementBalance,
+            tenGods: d.tenGods || d.tenGods,
+            // 把计算出的八字摘要也作为用户名传递进去
+            userName: `用户（${d.dayMaster || d.dayMaster}${d.dayMasterElement || d.dayMasterElement || ''}命）`,
+          };
+        })() : undefined,
       });
-      // 后端AI未实际运行（无token消耗），降级到本地规则引擎
-      if (!res.success || !res.data?.tokenUsage?.total) {
-        throw new Error('AI not configured');
+
+      // ✅ 核心判断依据：只要成功返回了内容就展示，不依赖 tokenUsage
+      // (缓存命中也可能有 totalTokens=0, 但有内容就是成功的)
+      if (res.success && res.data?.output) {
+        const aiMsg: Message = { role: 'assistant', content: res.data.output, timestamp: new Date() };
+        setMessages(prev => [...prev, aiMsg]);
+      } else {
+        // 降级：用本地规则引擎做兜底（但此时后端应该正常了）
+        await new Promise(r => setTimeout(r, 600));
+        const dm = baziData?.dayMaster || baziData?.dayMaster || '未知';
+        const ys = baziData?.usefulGod?.yongShen || baziData?.usefulGod?.yongShen || [];
+        const js = baziData?.usefulGod?.jiShen || baziData?.usefulGod?.jiShen || [];
+        const response = [
+          `【道之自然·命理提示】`,
+          '',
+          `您的日主为【${dm}】，命格分析如下：`,
+          '',
+
+          ...(ys.length > 0 ? [`✨ 用神：${ys.join('、')}`] : []),
+          ...(js.length > 0 ? [`⚠️ 忌神：${js.join('、')}`] : []),
+          '',
+          `关于「${msg.slice(0, 30)}」的问题：`,
+          '',
+          '命理不是宿命，而是能量地图。知道自己的五行强弱、用神忌神，就能在关键节点做出更好的选择。',
+          '',
+          '核心建议：',
+          ys.length > 0 ? `1. 善用用神（${ys.join('、')}）的力量` : '1. 结合自身五行能量顺势而为',
+          js.length > 0 ? `2. 避开忌神（${js.join('、')}）的干扰` : '2. 保持能量平衡',
+          '3. 平衡五行能量，顺势而为',
+          '',
+          '—— 道之自然·AI改命',
+        ].join('\n');
+        const aiMsg: Message = { role: 'assistant', content: response, timestamp: new Date() };
+        setMessages(prev => [...prev, aiMsg]);
       }
-      const aiMsg: Message = { role: 'assistant', content: res.data.output, timestamp: new Date() };
-      setMessages(prev => [...prev, aiMsg]);
     } catch {
+      // 网络异常降级
       await new Promise(r => setTimeout(r, 600));
-      const response = generateLocalResponse(msg, baziData);
-      const aiMsg: Message = { role: 'assistant', content: response, timestamp: new Date() };
+      const fallback = '抱歉，AI服务暂时不可用，请稍后重试。';
+      const aiMsg: Message = { role: 'assistant', content: fallback, timestamp: new Date() };
       setMessages(prev => [...prev, aiMsg]);
     }
     setLoading(false);
@@ -132,7 +192,7 @@ export default function AiPage() {
           </button>
           <h1 className="text-sm font-semibold">AI改命</h1>
           <span className="text-[10px] text-[#64748b] ml-auto">
-            {baziData ? `日主${baziData.dayMaster}` : '未排盘'}
+            {baziData ? `日主${baziData.dayMaster || baziData.dayMaster}${baziData.dayMasterElement || baziData.dayMasterElement || ''}` : '未排盘'}
           </span>
           {messages.length > 0 && (
             <button onClick={() => { setMessages([]); }}
@@ -143,7 +203,7 @@ export default function AiPage() {
         </div>
       </header>
 
-      {/* 建议栏 — 常驻，对话中也可见 */}
+      {/* 建议栏 */}
       <div className="sticky top-12 z-10 bg-[#0a0e17]/90 backdrop-blur-sm border-b border-[#1e293b] px-3 py-2 overflow-x-auto">
         <div className="flex gap-2 min-w-max">
           {SUGGESTIONS.map((s, i) => (
@@ -159,14 +219,13 @@ export default function AiPage() {
       <div className="flex-1 overflow-y-auto px-4 pt-3 pb-3 space-y-4">
         {messages.length === 0 ? (
           <>
-            {/* 欢迎语 */}
             <div className="rounded-2xl bg-gradient-to-br from-[#0f1525] to-[#1a2332] border border-[#f59e0b]/10 p-5 text-center">
               <div className="w-12 h-12 mx-auto mb-3 rounded-full bg-gradient-to-br from-[#f59e0b] to-[#d97706] flex items-center justify-center text-black font-bold text-lg">
                 道
               </div>
               <h2 className="text-base font-semibold text-[#f59e0b]">道之自然·AI改命</h2>
               <p className="text-xs text-[#64748b] mt-2 leading-relaxed">
-                知命不认命，改运先改心。{'\\n'}
+                知命不认命，改运先改心。{'\n'}
                 点击上方功能按钮或直接输入问题。
               </p>
               {!baziData && (
@@ -198,35 +257,27 @@ export default function AiPage() {
                 </div>
               </div>
             ))}
-            {loading && (
-              <div className="flex justify-start">
-                <div className="rounded-2xl bg-[#0f1525] border border-[#1e293b] p-3.5">
-                  <div className="flex items-center gap-2">
-                    <Loader2 size={14} className="text-[#f59e0b] animate-spin" />
-                    <span className="text-xs text-[#64748b]">正在推算...</span>
-                  </div>
-                </div>
-              </div>
-            )}
             <div ref={messagesEndRef} />
           </div>
         )}
       </div>
 
       {/* 输入框 */}
-      <div className="sticky bottom-0 bg-[#0a0e17]/90 backdrop-blur-lg border-t border-[#1e293b] px-4 py-3">
-        <form onSubmit={(e) => { e.preventDefault(); handleSend(input); }} className="flex gap-2">
+      <div className="sticky bottom-0 z-10 bg-[#0a0e17]/90 backdrop-blur-lg border-t border-[#1e293b] px-4 py-3">
+        <div className="flex items-center gap-3">
           <input
             value={input}
-            onChange={e => setInput(e.target.value)}
-            placeholder="输入您的问题..."
-            className="flex-1 bg-[#1a2332] border border-[#2a3a4e] rounded-xl px-4 py-2.5 text-sm text-[#e2e8f0] placeholder-[#4a5a6e] focus:border-[#f59e0b] focus:outline-none"
+            onChange={(e) => setInput(e.target.value)}
+            onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSend(''); } }}
+            placeholder={baziData ? '输入你的问题...' : '请先排盘以获取更精准的分析...'}
+            disabled={loading}
+            className="flex-1 bg-[#0f1525] border border-[#1e293b] rounded-xl px-4 py-2.5 text-sm text-[#e2e8f0] placeholder-[#4a5a6e] focus:outline-none focus:border-[#f59e0b]/50 disabled:opacity-50"
           />
-          <button type="submit" disabled={!input.trim() || loading}
-            className="w-10 h-10 rounded-xl bg-[#f59e0b] flex items-center justify-center disabled:opacity-30 transition-all active:scale-95">
-            <Send size={16} className="text-black" />
+          <button onClick={() => handleSend('')} disabled={loading || !input.trim()}
+            className="w-10 h-10 rounded-xl bg-gradient-to-br from-[#f59e0b] to-[#d97706] flex items-center justify-center text-black disabled:opacity-40 transition-all active:scale-90">
+            <Send size={16} />
           </button>
-        </form>
+        </div>
       </div>
     </div>
   );

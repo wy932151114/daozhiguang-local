@@ -28,3 +28,10 @@ export {
   WorkflowLog,
 } from './workflow-execution.schema';
 export { WorkflowTemplate, WorkflowTemplateSchema } from './workflow-template.schema';
+export {
+  ProviderConfig,
+  ProviderConfigSchema,
+  ProviderConfigDocument,
+  TestResult,
+  ProviderType,
+} from './provider-config.schema';

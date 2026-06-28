@@ -66,10 +66,11 @@ export function calcUsefulGod(
 
   if (strength.bodyStrength === '身强') {
     // 身强：克我(官杀) + 我生(食伤) + 我克(财) 为用
-    const controlMe = CONTROL[dmEl];  // 克我
+    // 克我：找到能克制日主五行的元素
+    const controlMe = Object.entries(CONTROL).find(([, v]) => v === dmEl)?.[0] as Element5;
     const iGenerate = GENERATE[dmEl]; // 我生
     const iControl = CONTROL[dmEl];   // 我克
-    yongShen = [controlMe, iGenerate].filter((v, i, a) => a.indexOf(v) === i);
+    yongShen = [controlMe, iGenerate, iControl].filter((v, i, a) => a.indexOf(v) === i);
     xiShen = yongShen.map(el => {
       // 喜神 = 生用神的
       for (const [k, v] of Object.entries(GENERATE)) {
@@ -77,13 +78,16 @@ export function calcUsefulGod(
       }
       return el;
     }).filter((v, i, a) => a.indexOf(v) === i);
-    jiShen = [dmEl, GENERATE[dmEl]].filter((v, i, a) => a.indexOf(v) === i);
+    // 忌神：生我（印）+ 同我（比劫）
+    const strengthenMe = Object.entries(GENERATE).find(([, v]) => v === dmEl)?.[0] as Element5;
+    jiShen = [dmEl, strengthenMe].filter((v, i, a) => a.indexOf(v) === i);
   } else if (strength.bodyStrength === '身弱') {
     // 身弱：生我(印) + 同我(比劫) 为用
     const generateMe = Object.entries(GENERATE).find(([, v]) => v === dmEl)?.[0] as Element5;
     yongShen = [generateMe, dmEl].filter((v, i, a) => a.indexOf(v) === i);
     xiShen = [generateMe, dmEl];
-    const controlMe = CONTROL[dmEl];
+    // 忌神：克我（官杀）
+    const controlMe = Object.entries(CONTROL).find(([, v]) => v === dmEl)?.[0] as Element5;
     jiShen = [controlMe].filter((v, i, a) => a.indexOf(v) === i);
   } else {
     // 中和：哪弱补哪

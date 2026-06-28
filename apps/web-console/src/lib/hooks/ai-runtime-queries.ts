@@ -12,16 +12,24 @@ const AI_API = '/api/v2/ai-runtime';
 
 async function fetchWithAuth(url: string, options?: RequestInit) {
   const token = useAuthStore.getState().token;
-  const res = await fetch(url, {
-    ...options,
-    headers: {
-      'Content-Type': 'application/json',
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
-      ...options?.headers,
-    },
-  });
-  if (!res.ok) throw new Error(await res.text().catch(() => res.statusText));
-  return res.json();
+  try {
+    const res = await fetch(url, {
+      ...options,
+      headers: {
+        'Content-Type': 'application/json',
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        ...options?.headers,
+      },
+    });
+    if (!res.ok) {
+      // 401/403 时静默返回空对象，避免触发 React 错误覆盖层
+      if (res.status === 401 || res.status === 403) return null;
+      throw new Error(await res.text().catch(() => res.statusText));
+    }
+    return res.json();
+  } catch {
+    return null;
+  }
 }
 
 // ============================================================

@@ -142,9 +142,23 @@ export class ReportJobProcessor {
 
       // 构建变量上下文字典
       const variables: Record<string, string> = {};
-      if (baziData) variables.baziData = JSON.stringify(baziData);
+      if (baziData) {
+        variables.baziData = JSON.stringify(baziData);
+        // 从 baziData 中提取用户姓名和出生信息（用于 prompt 模板变量）
+        variables.userName = baziData.userName || baziData.name || '用户';
+        variables.birthInfo = baziData.birthInfo
+          || (baziData.year && baziData.month && baziData.day
+            ? `${baziData.year}年${baziData.month}月${baziData.day}日${baziData.hour ? baziData.hour+'时' : ''}`
+            : '');
+      }
       if (userQuery) variables.userQuery = userQuery;
       if (context) variables.context = JSON.stringify(context);
+      // 始终传入 context（包含 reportType 和当前日期）
+      variables.context = JSON.stringify({
+        reportType: type,
+        currentDate: new Date().toISOString().split('T')[0],
+        ...(context || {}),
+      });
       variables.reportType = type;
 
       // 通过 Prompt Center 渲染 prompt 并调用 AI Runtime

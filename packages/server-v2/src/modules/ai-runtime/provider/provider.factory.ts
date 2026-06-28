@@ -2,11 +2,11 @@
  * ProviderFactory — AI Provider registry & factory
  *
  * Manages the lifecycle of all AI providers. Reads API keys from
- * environment variables (via ConfigService) and configures each provider
- * during module initialisation.
+ * ProviderConfigService (DB-backed, encrypted) instead of environment
+ * variables. Falls back to env vars if DB config is not available.
  * ========================================================================= */
 
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, Optional, Inject, forwardRef } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { AIProvider, AIProviderConfig } from '../interface/ai-provider.interface';
 import { OpenAIProvider } from './openai.provider';
@@ -16,21 +16,40 @@ import { QwenProvider } from './qwen.provider';
 import { ClaudeProvider } from './claude.provider';
 import { MCPProvider } from './mcp.provider';
 
+// Forward reference to avoid circular dependency
+export interface IProviderConfigService {
+  getEnabledProviderConfigs(): Promise<any[]>;
+  getProviderRuntimeConfig(name: string): Promise<any | null>;
+  isProviderConfigured(name: string): boolean;
+}
+
 @Injectable()
 export class ProviderFactory {
   private readonly logger = new Logger(ProviderFactory.name);
   private providers: Map<string, AIProvider> = new Map();
   private initialised = false;
 
-  constructor(private readonly configService: ConfigService) {
-    // Providers are registered lazily — call registerBuiltins() during
-    // onModuleInit or register() individually.
+  constructor(
+    private readonly configService: ConfigService,
+    @Optional() @Inject(forwardRef(() => 'ProviderConfigService'))
+    private providerConfigService?: IProviderConfigService,
+  ) {
+    // Register provider instances at construction time
+    this.registerInstance(new OpenAIProvider());
+    this.registerInstance(new GeminiProvider());
+    this.registerInstance(new DeepSeekProvider());
+    this.registerInstance(new QwenProvider());
+    this.registerInstance(new ClaudeProvider());
+    this.registerInstance(new MCPProvider());
   }
 
   /* -----------------------------------------------------------------------
-   * Registration
+   * Public API
    * ----------------------------------------------------------------------- */
 
+  /**
+   * Register a provider instance (legacy, for manual registration).
+   */
   register(provider: AIProvider): void {
     this.providers.set(provider.name, provider);
     this.logger.log(`Registered provider: ${provider.name} (${provider.displayName})`);
@@ -46,6 +65,66 @@ export class ProviderFactory {
 
   getConfiguredProviders(): AIProvider[] {
     return this.getAllProviders().filter((p) => p.isConfigured());
+  }
+
+  /* -----------------------------------------------------------------------
+   * DB-backed configuration reload
+   * ----------------------------------------------------------------------- */
+
+  /**
+   * Reload all provider configurations from ProviderConfigService (DB).
+   * Called by ProviderConfigService after any config change.
+   * Each provider's configure() is called with the settings from DB.
+   */
+  async reloadFromConfigService(providerConfigService: IProviderConfigService): Promise<void> {
+    this.providerConfigService = providerConfigService;
+
+    try {
+      const configs = await providerConfigService.getEnabledProviderConfigs();
+      let configuredCount = 0;
+
+      for (const cfg of configs) {
+        const provider = this.providers.get(cfg.name);
+        if (!provider) {
+          this.logger.warn(`Unknown provider in DB config: ${cfg.name}`);
+          continue;
+        }
+
+        if (cfg.apiKey) {
+          const providerCfg: AIProviderConfig = {
+            apiKey: cfg.apiKey,
+            ...(cfg.baseUrl ? { baseUrl: cfg.baseUrl } : {}),
+            ...(cfg.timeout ? { timeout: cfg.timeout } : {}),
+            ...(cfg.maxRetries ? { maxRetries: cfg.maxRetries } : {}),
+            ...(cfg.organization ? { organization: cfg.organization } : {}),
+            ...(cfg.defaultModel ? { model: cfg.defaultModel } : {}),
+            ...(cfg.extraHeaders ? { extraHeaders: cfg.extraHeaders } : {}),
+          };
+
+          provider.configure(providerCfg);
+          configuredCount++;
+          this.logger.debug(
+            `Configured "${cfg.name}" from DB (${cfg.apiKey.slice(0, 8)}...${cfg.apiKey.slice(-4)})`,
+          );
+        } else {
+          // Provider exists but has no API key — still register it as unconfigured
+          this.logger.warn(`Provider "${cfg.name}" has no API key configured`);
+        }
+      }
+
+      this.logger.log(
+        `Provider factory reloaded — ${this.providers.size} providers registered, ` +
+        `${configuredCount} configured with API keys`,
+      );
+    } catch (err: any) {
+      this.logger.error(
+        `Failed to reload provider configs from DB: ${err.message}. ` +
+        `Falling back to environment variables.`,
+      );
+      this.registerBuiltins();
+    }
+
+    this.initialised = true;
   }
 
   /* -----------------------------------------------------------------------
@@ -72,9 +151,10 @@ export class ProviderFactory {
   }
 
   /* -----------------------------------------------------------------------
-   * Register built-in providers
+   * Legacy env-based registration (fallback only)
    *
-   * Call this from onModuleInit() of the parent module.
+   * Used when DB backend is unavailable (first startup before seeding,
+   * or DB connection failure).
    * ----------------------------------------------------------------------- */
 
   registerBuiltins(): void {
@@ -111,13 +191,12 @@ export class ProviderFactory {
 
         provider.configure(config);
         this.logger.log(
-          `Configured provider "${provider.name}" with API key ` +
+          `Configured provider "${provider.name}" from env ${envKey}` +
           `(${apiKey.slice(0, 8)}...${apiKey.slice(-4)})`,
         );
       } else {
         this.logger.warn(
-          `Provider "${provider.name}" skipped — environment variable ${envKey} not set. ` +
-          `Generate / health checks will report the provider as unconfigured.`,
+          `Provider "${provider.name}" skipped — ${envKey} not set in env.`,
         );
       }
 
@@ -126,8 +205,16 @@ export class ProviderFactory {
 
     this.initialised = true;
     this.logger.log(
-      `Provider factory initialised — ${this.getAllProviders().length} providers registered, ` +
+      `Provider factory initialised from env — ${this.getAllProviders().length} providers registered, ` +
       `${this.getConfiguredProviders().length} configured.`,
     );
+  }
+
+  /* -----------------------------------------------------------------------
+   * Private
+   * ----------------------------------------------------------------------- */
+
+  private registerInstance(provider: AIProvider): void {
+    this.providers.set(provider.name, provider);
   }
 }

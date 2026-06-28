@@ -121,9 +121,11 @@ export class ReportController {
     @Body() dto: ExportReportDto,
     @Res() res: Response,
   ) {
-    const pdf = await this.report.exportReport(userId, dto.reportId, 'pdf');
+    const pdfBase64 = await this.report.exportReport(userId, dto.reportId, 'pdf');
+    const pdfBuffer = Buffer.from(pdfBase64, 'base64');
     res.setHeader('Content-Disposition', `attachment; filename="report-${dto.reportId}.pdf"`);
-    res.send(pdf);
+    res.setHeader('Content-Length', pdfBuffer.length);
+    res.end(pdfBuffer);
   }
 
   @Post('export/markdown')

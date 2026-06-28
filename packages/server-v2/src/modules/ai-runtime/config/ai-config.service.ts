@@ -48,26 +48,33 @@ export class AiConfigService {
         this.configService.get<string>('AI_DEFAULT_MODEL') ??
         DEFAULT_RUNTIME_CONFIG.defaultModel,
       temperature:
-        this.configService.get<number>('AI_TEMPERATURE') ??
-        DEFAULT_RUNTIME_CONFIG.temperature,
+        this.configService.get<string>('AI_TEMPERATURE') !== undefined
+          ? Number(this.configService.get<string>('AI_TEMPERATURE'))
+          : DEFAULT_RUNTIME_CONFIG.temperature,
       topP:
-        this.configService.get<number>('AI_TOP_P') ??
-        DEFAULT_RUNTIME_CONFIG.topP,
+        this.configService.get<string>('AI_TOP_P') !== undefined
+          ? Number(this.configService.get<string>('AI_TOP_P'))
+          : DEFAULT_RUNTIME_CONFIG.topP,
       maxTokens:
-        this.configService.get<number>('AI_MAX_TOKENS') ??
-        DEFAULT_RUNTIME_CONFIG.maxTokens,
+        this.configService.get<string>('AI_MAX_TOKENS') !== undefined
+          ? Number(this.configService.get<string>('AI_MAX_TOKENS'))
+          : DEFAULT_RUNTIME_CONFIG.maxTokens,
       cacheTTL:
-        this.configService.get<number>('AI_CACHE_TTL') ??
-        DEFAULT_RUNTIME_CONFIG.cacheTTL,
+        this.configService.get<string>('AI_CACHE_TTL') !== undefined
+          ? Number(this.configService.get<string>('AI_CACHE_TTL'))
+          : DEFAULT_RUNTIME_CONFIG.cacheTTL,
       retryCount:
-        this.configService.get<number>('AI_RETRY_COUNT') ??
-        DEFAULT_RUNTIME_CONFIG.retryCount,
+        this.configService.get<string>('AI_RETRY_COUNT') !== undefined
+          ? Number(this.configService.get<string>('AI_RETRY_COUNT'))
+          : DEFAULT_RUNTIME_CONFIG.retryCount,
       retryDelay:
-        this.configService.get<number>('AI_RETRY_DELAY') ??
-        DEFAULT_RUNTIME_CONFIG.retryDelay,
+        this.configService.get<string>('AI_RETRY_DELAY') !== undefined
+          ? Number(this.configService.get<string>('AI_RETRY_DELAY'))
+          : DEFAULT_RUNTIME_CONFIG.retryDelay,
       fallbackEnabled:
-        this.configService.get<boolean>('AI_FALLBACK_ENABLED') ??
-        DEFAULT_RUNTIME_CONFIG.fallbackEnabled,
+        this.configService.get<string>('AI_FALLBACK_ENABLED') !== undefined
+          ? this.configService.get<string>('AI_FALLBACK_ENABLED') === 'true'
+          : DEFAULT_RUNTIME_CONFIG.fallbackEnabled,
     };
   }
 

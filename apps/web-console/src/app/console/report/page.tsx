@@ -56,7 +56,54 @@ export default function ReportCenterPage() {
     setLoading(true);
     setError(null);
     try {
-      const result = await reportApi.generate(type, baziData);
+      // 如果没有明确传 baziData，尝试从 sessionStorage 读取当前排盘数据
+      let effectiveBazi = baziData;
+      if (!effectiveBazi) {
+        try {
+          const stored = sessionStorage.getItem('dzs_bazi_result');
+          if (stored) {
+            const parsed = JSON.parse(stored);
+            effectiveBazi = parsed.data || parsed;
+          }
+        } catch {}
+      }
+
+      // 从首页输入数据获取用户姓名和出生信息
+      let userName = '';
+      let birthInfo = '';
+      try {
+        const baziInput = sessionStorage.getItem('dzs_bazi_input');
+        if (baziInput) {
+          const inputData = JSON.parse(baziInput);
+          userName = inputData.userName || inputData.name || '';
+          // 构建出生信息字符串（含时辰和性别）
+          const hourStr = inputData.hour !== undefined && inputData.hour !== null
+            ? `${String(inputData.hour).padStart(2, '0')}:${String(inputData.minute || 0).padStart(2, '0')}`
+            : '未知时辰';
+          const genderStr = inputData.gender === '男' || inputData.gender === 'male' ? '男' :
+                            inputData.gender === '女' || inputData.gender === 'female' ? '女' : '未知';
+          birthInfo = `${inputData.year}年${inputData.month}月${inputData.day}日 ${hourStr}，${genderStr}性`;
+          if (inputData.birthPlace) birthInfo += `，出生地${inputData.birthPlace}`;
+        }
+      } catch {}
+
+      // 如果 effectiveBazi 中有姓名信息也提取
+      if (!userName && effectiveBazi?.userName) {
+        userName = effectiveBazi.userName;
+      }
+      if (!userName && effectiveBazi?.name) {
+        userName = effectiveBazi.name;
+      }
+
+      // 构建完整的 baziData 包（含 userName、birthInfo、性别和全量算法数据）
+      const payloadBazi = effectiveBazi ? {
+        ...effectiveBazi,
+        userName: userName || undefined,
+        birthInfo: birthInfo || effectiveBazi.birthInfo || '',
+        gender: effectiveBazi.gender || undefined,
+      } : undefined;
+
+      const result = await reportApi.generate(type, payloadBazi);
       setJobStatus(result);
       // 轮询进度
       pollJobProgress(result.jobId);

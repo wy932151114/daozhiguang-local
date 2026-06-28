@@ -144,6 +144,17 @@ export default function HomePage() {
       if (data.success) {
         setResult(data.data); baziStore.setResult(data.data);
         try { sessionStorage.setItem('dzs_bazi_result', JSON.stringify(data.data)); } catch {}
+        try { sessionStorage.setItem('dzs_bazi_input', JSON.stringify({
+          year: input.year || parseInt(year),
+          month: input.month || parseInt(month),
+          day: input.day || parseInt(day),
+          hour: input.hour ?? 12,
+          minute: input.minute ?? 0,
+          gender: input.gender || gender,
+          birthPlace: input.birthPlace || '',
+          longitude: input.longitude || 120,
+          useTrueSolar: input.useTrueSolar ?? true,
+        })); } catch {}
         setActiveTab('bazi');
         setTimeout(() => resultRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 100);
       } else setError(data.error || '计算失败');
@@ -170,6 +181,13 @@ export default function HomePage() {
       if (data.success) {
         setResult(data.data); baziStore.setResult(data.data);
         try { sessionStorage.setItem('dzs_bazi_result', JSON.stringify(data.data)); } catch {}
+        try { sessionStorage.setItem('dzs_bazi_input', JSON.stringify({
+          year: parseInt(year), month: parseInt(month), day: parseInt(day),
+          hour: hour ? parseInt(hour) : 12, minute: parseInt(minute || '0'),
+          gender, birthPlace: '',
+          longitude: useTrueSolar ? parseFloat(longitude || '120') : 120,
+          useTrueSolar: useTrueSolar ?? true,
+        })); } catch {}
         const record = {
           id: Date.now(),
           time: `${year}-${month.padStart(2,'0')}-${day.padStart(2,'0')} ${hour || '?'}:${minute.padStart(2,'0')}`,

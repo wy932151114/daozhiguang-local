@@ -38,6 +38,7 @@
   },
   "dependencies": {
     "@nestjs/bullmq": "^10.2.3",
-    "bullmq": "^5.79.1"
+    "bullmq": "^5.79.1",
+    "puppeteer-core": "^25.2.1"
   }
 }

@@ -91,7 +91,7 @@ export default function DashboardPage() {
       {/* 顶部标题 */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-[#e2e8f0] tracking-tight">DZS-OS Dashboard</h1>
+          <h1 className="text-2xl font-bold text-[#e2e8f0] tracking-tight">DZS-OS 仪表盘</h1>
           <p className="text-sm text-[#64748b] mt-1">道之自然命理AI操作系统 · 实时监控面板</p>
         </div>
         <div className="flex items-center gap-4 text-sm text-[#94a3b8]">
@@ -101,7 +101,7 @@ export default function DashboardPage() {
           </div>
           <div className={cn('flex items-center gap-2', validationStatus?.passed ? 'text-[#2ECC71]' : 'text-[#64748b]')}>
             <Shield size={14} />
-            <span>{validLoading ? '检查中...' : validationStatus?.passed ? 'Validation PASS' : 'Validation --'}</span>
+            <span>{validLoading ? '检查中...' : validationStatus?.passed ? '验证通过' : '验证待检'}</span>
           </div>
         </div>
       </div>
@@ -152,10 +152,10 @@ export default function DashboardPage() {
         <div className="dzg-card p-4 col-span-1">
           <h3 className="text-sm font-semibold text-[#e2e8f0] mb-4">系统状态</h3>
           <div className="space-y-3">
-            <StatusRow label="Kernel" value="运行中" color="#2ECC71" />
-            <StatusRow label="Energy Bus" value="激活" color="#2ECC71" />
-            <StatusRow label="Validation" value={validLoading ? '检查中' : validationStatus?.passed ? '通过' : '等待中'} color={validationStatus?.passed ? '#2ECC71' : '#F39C12'} />
-            <StatusRow label="AI Runtime" value="就绪" color="#2ECC71" />
+            <StatusRow label="系统内核" value="运行中" color="#2ECC71" />
+            <StatusRow label="能量总线" value="激活" color="#2ECC71" />
+            <StatusRow label="系统验证" value={validLoading ? '检查中' : validationStatus?.passed ? '通过' : '等待中'} color={validationStatus?.passed ? '#2ECC71' : '#F39C12'} />
+            <StatusRow label="AI引擎" value="就绪" color="#2ECC71" />
             <StatusRow label="协议版本" value="2.3" color="#94a3b8" />
             <StatusRow label="运行模式" value={systemMode} color="#f59e0b" />
           </div>
@@ -182,14 +182,14 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      {/* AI Runtime 状态卡片 */}
+      {/* AI 运行引擎状态卡片 */}
       <div className="dzg-card p-4">
-        <h3 className="text-sm font-semibold text-[#e2e8f0] mb-4">AI Runtime</h3>
+        <h3 className="text-sm font-semibold text-[#e2e8f0] mb-4">AI 运行引擎</h3>
         <div className="grid grid-cols-4 gap-4">
           <StatusMiniCard
             label="Provider 在线"
             value={aiHealth
-              ? `${(aiHealth.providers || []).filter((p: any) => p.status === 'healthy').length}/${aiHealth.providerCount || 0}`
+              ? `${Object.values(aiHealth.providers || {}).filter((p: any) => p.status === 'healthy').length}/${Object.keys(aiHealth.providers || {}).length}`
               : '--'}
             color="#8B5CF6"
           />
@@ -202,8 +202,8 @@ export default function DashboardPage() {
             label="缓存命中率"
             value={tokenStats?.cacheHitRate != null
               ? `${(tokenStats.cacheHitRate * 100).toFixed(1)}%`
-              : aiHealth?.cacheEnabled != null
-                ? (aiHealth.cacheEnabled ? '启用' : '禁用')
+              : aiHealth?.cache?.enabled != null
+                ? (aiHealth.cache.enabled ? '启用' : '禁用')
                 : '--'}
             color="#2ECC71"
           />
@@ -218,15 +218,15 @@ export default function DashboardPage() {
       {/* 底部：状态面板 */}
       <div className="grid grid-cols-2 gap-6">
         <div className="dzg-card p-4">
-          <h3 className="text-sm font-semibold text-[#e2e8f0] mb-3">Activity Log</h3>
+          <h3 className="text-sm font-semibold text-[#e2e8f0] mb-3">活动日志</h3>
           <div className="space-y-2 text-xs text-[#94a3b8]">
-            <ActivityLog time={time.toLocaleTimeString('zh-CN')} event="System running" type="success" />
-            <ActivityLog time="--" event={`Validation: ${validationStatus?.passed ? 'PASS' : 'PENDING'}`} type={validationStatus?.passed ? 'success' : 'warn'} />
+            <ActivityLog time={time.toLocaleTimeString('zh-CN')} event="系统运行中" type="success" />
+            <ActivityLog time="--" event={`系统验证: ${validationStatus?.passed ? '通过' : '待检'}`} type={validationStatus?.passed ? 'success' : 'warn'} />
             <ActivityLog time="--" event={`API: ${process.env.NEXT_PUBLIC_API_URL || 'localhost:4000'}`} type="info" />
           </div>
         </div>
         <div className="dzg-card p-4">
-          <h3 className="text-sm font-semibold text-[#e2e8f0] mb-3">Validation Checks</h3>
+          <h3 className="text-sm font-semibold text-[#e2e8f0] mb-3">系统验证</h3>
           <div className="space-y-2 text-xs">
             <CheckRow label="四柱完整性" passed={!!data?.pillars} />
             <CheckRow label="五行正数" passed={!!data?.elementBalance} />

@@ -252,6 +252,120 @@ export function useWorkflow(workflowId: string) {
   });
 }
 
+// ============================================================
+// Provider Config — React Query Hooks
+// ============================================================
+
+export interface ProviderConfigItem {
+  name: string;
+  displayName: string;
+  type: string;
+  apiKeyMasked: string;
+  baseUrl?: string;
+  defaultModel?: string;
+  enabled: boolean;
+  priority: number;
+  timeout: number;
+  rpm: number;
+  tpm: number;
+  maxRetries: number;
+  retryDelay: number;
+  organization?: string;
+  extraHeaders: Record<string, string>;
+  isBuiltin: boolean;
+  lastTestResult?: {
+    status: 'healthy' | 'degraded' | 'unhealthy';
+    latency: number;
+    model: string;
+    error?: string;
+    timestamp: string;
+  };
+  hasApiKey: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface TestConnectionResult {
+  provider: string;
+  status: 'healthy' | 'degraded' | 'unhealthy';
+  latency: number;
+  model: string;
+  error?: string;
+  timestamp: string;
+}
+
+export const providerConfigKeys = {
+  all: ['provider-config'] as const,
+};
+
+async function providerConfigFetch<T>(url: string, options?: RequestInit): Promise<T> {
+  const token = typeof window !== 'undefined' ? localStorage.getItem('dzs_v2_token') : null;
+  const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+  if (token) headers['Authorization'] = `Bearer ${token}`;
+  try {
+    const res = await fetch(url, { ...options, headers: { ...headers, ...options?.headers } });
+    const data = await res.json();
+    if (!res.ok) {
+      // 401/403 时返回空数组而非抛错
+      if (res.status === 401 || res.status === 403) return ([] as unknown) as T;
+      throw new Error(data?.message || data?.error || `请求失败 ${res.status}`);
+    }
+    return data;
+  } catch {
+    return ([] as unknown) as T;
+  }
+}
+
+export function useProviderConfigs(enabled?: boolean) {
+  return useQuery({
+    queryKey: providerConfigKeys.all,
+    queryFn: async (): Promise<ProviderConfigItem[]> => {
+      const data = await providerConfigFetch<any>('/api/v2/provider-config');
+      return Array.isArray(data) ? data : [];
+    },
+    enabled: enabled ?? true,
+    refetchInterval: (query) => {
+      // 如果数据为空（还没拿到 token），每 3 秒重试
+      if (query.state.data && Array.isArray(query.state.data) && query.state.data.length === 0) {
+        return 3000;
+      }
+      return 30000;
+    },
+    staleTime: 0,
+    retry: 3,
+    retryDelay: 2000,
+  });
+}
+
+export function useUpdateProviderConfig() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ name, ...data }: { name: string } & Record<string, any>) => {
+      return providerConfigFetch<any>(`/api/v2/provider-config/${encodeURIComponent(name)}`, {
+        method: 'PUT',
+        body: JSON.stringify(data),
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: providerConfigKeys.all });
+    },
+  });
+}
+
+export function useTestProviderConnection() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (name: string): Promise<TestConnectionResult> => {
+      return providerConfigFetch<any>(`/api/v2/provider-config/${encodeURIComponent(name)}/test`, {
+        method: 'POST',
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: providerConfigKeys.all });
+    },
+  });
+}
+
 // ── Hooks: 统计 ──
 export function useWorkflowStats() {
   return useQuery({

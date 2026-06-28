@@ -66,13 +66,12 @@ export class PDFReportRenderer implements IReportRenderer {
   }
 
   /**
-   * 检查 puppeteer 是否可用
+   * 检查 puppeteer-core 是否可用（使用系统 Chrome）
    */
   private async checkPuppeteer(): Promise<boolean> {
     if (this.puppeteerAvailable !== null) return this.puppeteerAvailable;
     try {
-      // @ts-expect-error 可选依赖 — 运行时按需检查
-      await import('puppeteer');
+      await import('puppeteer-core');
       this.puppeteerAvailable = true;
     } catch {
       this.puppeteerAvailable = false;
@@ -81,19 +80,26 @@ export class PDFReportRenderer implements IReportRenderer {
   }
 
   /**
+   * 获取系统 Chrome 的可执行路径
+   */
+  private getChromeExecutablePath(): string {
+    return '/usr/bin/google-chrome-stable';
+  }
+
+  /**
    * 使用 puppeteer 将 HTML 转为 PDF Buffer
    */
   private async htmlToPdf(html: string, options?: RenderOptions): Promise<Buffer> {
-    // @ts-expect-error 可选依赖 — 运行时按需检查
-    const puppeteer = await import('puppeteer');
+    const puppeteer = await import('puppeteer-core');
     const browser = await puppeteer.launch({
       headless: true,
-      args: ['--no-sandbox', '--disable-setuid-sandbox'],
+      executablePath: this.getChromeExecutablePath(),
+      args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage'],
     });
 
     try {
       const page = await browser.newPage();
-      await page.setContent(html, { waitUntil: 'networkidle0' });
+      await page.setContent(html, { waitUntil: 'networkidle2' as any });
 
       const pdfOpts = options?.pdfOptions ?? {};
       const pdfBuffer = await page.pdf({

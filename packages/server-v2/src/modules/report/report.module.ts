@@ -11,6 +11,7 @@ import { ReportQueue, ReportQueueSchema } from '@/database/mongoose/schemas/repo
 import { ReportQueueModule } from './infrastructure/report-queue.module';
 import { ReportService } from './domain/report.service';
 import { ReportController } from './interface/report.controller';
+import { RendererService } from './renderer/renderer.service';
 
 @Module({
   imports: [
@@ -25,6 +26,7 @@ import { ReportController } from './interface/report.controller';
   ],
   providers: [
     ReportService,
+    RendererService,
   ],
   exports: [
     ReportService,

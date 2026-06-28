@@ -7,9 +7,10 @@ import { Injectable, Logger, NotFoundException, BadRequestException } from '@nes
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 
-import { Report, ReportDocument, ReportStatus } from '@/database/mongoose/schemas/report.schema';
+import { Report, ReportDocument, ReportStatus, ExportFormat } from '@/database/mongoose/schemas/report.schema';
 import { ReportQueueService } from '../infrastructure/report-queue.service';
 import { ReportCacheService } from '../infrastructure/report-cache.service';
+import { RendererService } from '../renderer/renderer.service';
 import {
   CreateReportDto,
   QueryReportDto,
@@ -28,7 +29,29 @@ export class ReportService {
     @InjectModel(Report.name) private readonly reportModel: Model<ReportDocument>,
     private readonly queueService: ReportQueueService,
     private readonly cacheService: ReportCacheService,
+    private readonly rendererService: RendererService,
   ) {}
+
+  // ── 报告类型 → Prompt ID 映射 ────────────────────────────────
+
+  private readonly TYPE_TO_PROMPT: Record<string, string> = {
+    bazi: 'bazi-analysis',
+    wuxing: 'wuxing-analysis',
+    jiugong: 'jiugong-analysis',
+    fengshui: 'fengshui-analysis',
+    ai_comprehensive: 'comprehensive-analysis',
+    enterprise: 'comprehensive-analysis',
+    daily: 'daily-fortune',
+    weekly: 'daily-fortune',
+    monthly: 'comprehensive-analysis',
+    yearly: 'comprehensive-analysis',
+    dayun: 'comprehensive-analysis',
+  };
+
+  // ── 默认 AI Provider/Model ─────────────────────────────────
+
+  private readonly DEFAULT_PROVIDER = 'deepseek';
+  private readonly DEFAULT_MODEL = 'deepseek-v4-flash';
 
   // ── 报告创建 ────────────────────────────────────────────────
 
@@ -36,6 +59,11 @@ export class ReportService {
    * 创建报告并提交到 BullMQ 队列
    */
   async create(userId: string, dto: CreateReportDto): Promise<{ reportId: string; jobId: string }> {
+    // 自动映射 type → promptId
+    const promptId = dto.promptId || this.TYPE_TO_PROMPT[dto.type];
+    const provider = dto.provider || this.DEFAULT_PROVIDER;
+    const model = dto.model || this.DEFAULT_MODEL;
+
     // 1. 创建报告记录（状态：pending）
     const report = await this.reportModel.create({
       userId,
@@ -46,10 +74,10 @@ export class ReportService {
         userQuery: dto.userQuery,
         context: dto.context,
       },
-      promptId: dto.promptId,
+      promptId,
       promptVersion: dto.promptVersion,
-      provider: dto.provider,
-      model: dto.model,
+      provider,
+      model,
     });
 
     // 2. 提交到 BullMQ 队列
@@ -60,10 +88,10 @@ export class ReportService {
       baziData: dto.baziData,
       userQuery: dto.userQuery,
       context: dto.context,
-      promptId: dto.promptId,
+      promptId,
       promptVersion: dto.promptVersion,
-      provider: dto.provider,
-      model: dto.model,
+      provider,
+      model,
     };
 
     const job = await this.queueService.addJob(jobData);
@@ -233,15 +261,18 @@ export class ReportService {
    */
   async exportReport(userId: string, reportId: string, format: string): Promise<string> {
     const report = await this.findById(reportId, userId);
-    // 简化实现：返回报告内容拼接
     const sections = (report as any).sections || [];
-    if (format === 'html') {
-      return sections.map((s: any) => `<h2>${s.title}</h2><p>${s.content}</p>`).join('\n');
-    }
-    if (format === 'markdown') {
-      return sections.map((s: any) => `## ${s.title}\n\n${s.content}`).join('\n\n');
-    }
-    return JSON.stringify(report);
+    const renderContext = {
+      title: (report as any).title || '命理报告',
+      sections,
+      reportType: (report as any).type || 'unknown',
+      userName: (report as any).input?.baziData?.userName,
+      generatedAt: new Date(),
+      aiModelVersion: (report as any).aiModelVersion,
+      tokenUsage: (report as any).tokenUsage,
+    };
+    const result = await this.rendererService.render(format as ExportFormat, renderContext);
+    return result.content;
   }
 
   // ── 任务进度查询 ──────────────────────────────────────────

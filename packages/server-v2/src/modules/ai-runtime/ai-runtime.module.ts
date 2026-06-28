@@ -33,6 +33,7 @@ import { DeepSeekProvider } from './provider/deepseek.provider';
 import { QwenProvider } from './provider/qwen.provider';
 import { ClaudeProvider } from './provider/claude.provider';
 import { MCPProvider } from './provider/mcp.provider';
+import { ProviderConnectionTester } from './provider/provider-tester';
 
 @Module({
   imports: [
@@ -60,11 +61,13 @@ import { MCPProvider } from './provider/mcp.provider';
     QwenProvider,
     ClaudeProvider,
     MCPProvider,
+    ProviderConnectionTester,
   ],
   exports: [
     AIRuntimeService,
     ProviderFactory,
     AIRouter,
+    ProviderConnectionTester,
   ],
 })
 export class AIRuntimeModule {}

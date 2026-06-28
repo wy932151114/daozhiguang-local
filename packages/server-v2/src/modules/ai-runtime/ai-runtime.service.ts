@@ -34,9 +34,11 @@ export class AIRuntimeService implements OnModuleInit {
   ) {}
 
   async onModuleInit() {
-    // Seed built-in models and register providers on startup
+    // Seed built-in models in MongoDB
     await this.seedModels();
-    this.providerFactory.registerBuiltins();
+    // NOTE: Provider configuration is now managed by ProviderConfigModule
+    // (DB-backed, encrypted). ProviderFactory is refreshed automatically
+    // by ProviderConfigService.onModuleInit() and on each config update.
     this.logger.log('AIRuntimeService initialised');
   }
 

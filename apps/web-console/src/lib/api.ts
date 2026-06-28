@@ -188,9 +188,82 @@ export interface AiGenerateResult {
   riskCheck: { passed: boolean; warnings: string[] };
 }
 
+// V2 API 基础地址
+const v2Api = axios.create({
+  baseURL: '/api/v2',
+  timeout: 60000,
+  headers: { 'Content-Type': 'application/json' },
+});
+
 export async function generateAI(input: AiGenerateInput): Promise<APIResponse<AiGenerateResult>> {
-  const { data } = await api.post<APIResponse<AiGenerateResult>>('/ai/generate', input);
-  return data;
+  // 自动获取 token（兼容 H5 页面未有 token 的场景）
+  let token = typeof window !== 'undefined' ? localStorage.getItem('dzs_v2_token') : null;
+
+  if (!token) {
+    // 尝试自动游客登录
+    try {
+      const guestRes = await axios.post('/api/v2/auth/guest', {}, { timeout: 5000 });
+      if (guestRes.data?.accessToken) {
+        token = guestRes.data.accessToken;
+        localStorage.setItem('dzs_v2_token', token);
+      }
+    } catch { /* 静默失败，无 token 走 V1 降级 */ }
+  }
+
+  const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+  if (token) headers['Authorization'] = `Bearer ${token}`;
+
+  try {
+    // 调用 V2 AI Runtime
+    const { data } = await axios.post('/api/v2/ai-runtime/generate', {
+      provider: 'deepseek',
+      model: 'deepseek-v4-flash',
+      messages: [
+        { role: 'system', content: input.systemPrompt },
+        { role: 'user', content: input.baziData
+          ? `【八字数据】\n${JSON.stringify(input.baziData, null, 2)}\n\n【用户问题】\n${input.prompt}`
+          : input.prompt },
+      ],
+      temperature: 0.7,
+      maxTokens: 4096,
+    }, { headers, timeout: 60000 });
+
+    return {
+      success: true,
+      data: {
+        output: data.content || '',
+        validation: { passed: true, errors: [], warnings: [] },
+        tokenUsage: {
+          prompt: data.usage?.promptTokens || 0,
+          completion: data.usage?.completionTokens || 0,
+          total: data.usage?.totalTokens || 0,
+        },
+        riskCheck: { passed: true, warnings: [] },
+      },
+      timestamp: new Date().toISOString(),
+      source: 'v2-ai-runtime',
+    };
+  } catch (err: any) {
+    // V2 失败时尝试 V1（兼容旧版）
+    if (token) {
+      try {
+        const { data } = await api.post<APIResponse<AiGenerateResult>>('/ai/generate', input);
+        return data;
+      } catch { /* V1 also failed */ }
+    }
+    // 返回失败结果 — 前端应有合理降级处理
+    return {
+      success: false,
+      data: {
+        output: '',
+        validation: { passed: false, errors: ['AI 服务暂不可用'], warnings: [] },
+        tokenUsage: { prompt: 0, completion: 0, total: 0 },
+        riskCheck: { passed: false, warnings: ['AI 服务降级'] },
+      },
+      timestamp: new Date().toISOString(),
+      source: 'fallback',
+    };
+  }
 }
 
 // ============================================================

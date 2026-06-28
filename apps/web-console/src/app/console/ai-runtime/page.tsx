@@ -40,7 +40,7 @@ export default function AIRuntimePage() {
   return (
     <div className="p-6 space-y-6">
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold text-[#e2e8f0]">AI Runtime</h1>
+        <h1 className="text-2xl font-bold text-[#e2e8f0]">AI 运行引擎</h1>
         <button onClick={fetchAll} className="flex items-center gap-2 px-4 py-2 rounded-lg bg-[rgba(245,158,11,0.1)] border border-[rgba(245,158,11,0.2)] text-[#f59e0b] text-sm">
           <RefreshCw size={14} /> 刷新
         </button>
