@@ -70,7 +70,7 @@ jobs:
         run: cd packages/utils && npx tsc --outDir dist --skipLibCheck && cd ../..
 
       - name: Build @dzs/server
-        run: cd packages/server && nest build && cd ../..
+        run: cd packages/server && npx tsc --outDir dist --skipLibCheck && cd ../..
 
       - name: Upload library artifacts
         uses: actions/upload-artifact@v4
