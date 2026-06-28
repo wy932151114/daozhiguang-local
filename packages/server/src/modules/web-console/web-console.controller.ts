@@ -144,8 +144,8 @@ export class WebConsoleController {
         data: {
           output: result.content || '',
           validation: { passed: true, errors: [], warnings: [] },
-          tokenUsage: result.usage
-            ? { prompt: result.usage.prompt_tokens || 0, completion: result.usage.completion_tokens || 0, total: (result.usage.prompt_tokens || 0) + (result.usage.completion_tokens || 0) }
+          tokenUsage: 'usage' in result && result.usage
+            ? { prompt: (result.usage as any).prompt_tokens || 0, completion: (result.usage as any).completion_tokens || 0, total: ((result.usage as any).prompt_tokens || 0) + ((result.usage as any).completion_tokens || 0) }
             : { prompt: 0, completion: 0, total: 0 },
           riskCheck: { passed: true, warnings: [] },
         },

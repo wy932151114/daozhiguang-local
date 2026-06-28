@@ -82,24 +82,35 @@ export class UserService {
       useTrueSolar: data.useTrueSolar,
     });
 
-    const wx = this.wuxingEngine.analyze(bazi.raw as any);
+    // 构造扁平八字数据（给五行引擎使用）
+    const baziFlat = {
+      year: bazi.pillars.year,
+      month: bazi.pillars.month,
+      day: bazi.pillars.day,
+      hour: bazi.pillars.hour,
+      dayMaster: bazi.dayMaster,
+      gender: bazi.gender as '男' | '女',
+      birthTime: new Date().toISOString(),
+    };
+
+    const wx = this.wuxingEngine.analyze(baziFlat);
 
     await this.baziModel.create({
       userId,
       birthInfoId: info._id,
-      yearStem: bazi.raw.year.heavenlyStem,
-      yearBranch: bazi.raw.year.earthlyBranch,
-      yearNayin: bazi.raw.year.nayin,
-      monthStem: bazi.raw.month.heavenlyStem,
-      monthBranch: bazi.raw.month.earthlyBranch,
-      monthNayin: bazi.raw.month.nayin,
-      dayStem: bazi.raw.day.heavenlyStem,
-      dayBranch: bazi.raw.day.earthlyBranch,
-      dayNayin: bazi.raw.day.nayin,
-      hourStem: bazi.raw.hour.heavenlyStem,
-      hourBranch: bazi.raw.hour.earthlyBranch,
-      hourNayin: bazi.raw.hour.nayin,
-      dayMaster: bazi.raw.dayMaster,
+      yearStem: bazi.pillars.year.heavenlyStem,
+      yearBranch: bazi.pillars.year.earthlyBranch,
+      yearNayin: bazi.pillars.year.nayin,
+      monthStem: bazi.pillars.month.heavenlyStem,
+      monthBranch: bazi.pillars.month.earthlyBranch,
+      monthNayin: bazi.pillars.month.nayin,
+      dayStem: bazi.pillars.day.heavenlyStem,
+      dayBranch: bazi.pillars.day.earthlyBranch,
+      dayNayin: bazi.pillars.day.nayin,
+      hourStem: bazi.pillars.hour.heavenlyStem,
+      hourBranch: bazi.pillars.hour.earthlyBranch,
+      hourNayin: bazi.pillars.hour.nayin,
+      dayMaster: bazi.dayMaster,
       dayMasterWuxing: wx.dayMasterWx,
       wuxingScores: wx.scores,
       wuxingPercentage: wx.percentage,
@@ -114,7 +125,14 @@ export class UserService {
 
     return {
       birthInfo: info,
-      bazi: bazi.summary,
+      bazi: {
+        year: bazi.pillars.year.full,
+        month: bazi.pillars.month.full,
+        day: bazi.pillars.day.full,
+        hour: bazi.pillars.hour.full,
+        dayMaster: bazi.dayMaster,
+        gender: bazi.gender,
+      },
       wuxing: wx,
     };
   }

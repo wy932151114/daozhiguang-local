@@ -11,6 +11,6 @@ export class DailyFortuneController {
 
   @Get('today')
   getToday() {
-    return this.service.getToday();
+    return this.service.getTodayFortune();
   }
 }

@@ -3,11 +3,11 @@
 // ============================================================
 
 import { Injectable } from '@nestjs/common';
-import { WuxingEngine } from '../../engines';
+import { WuXingEnergyEngine } from '../../engines/wuxing-engine/wuxing-energy.engine';
 
 @Injectable()
 export class WuxingService {
-  private readonly engine = new WuxingEngine();
+  private readonly engine = new WuXingEnergyEngine();
 
   analyzeEnergy(data: any) {
     return this.engine.calculateEnergyField(data);
