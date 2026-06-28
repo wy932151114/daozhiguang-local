@@ -74,7 +74,8 @@ export default function DayunPage() {
   const dayunList = generateDayun(baziData);
   const currentYearGanzhi = getCurrentYearGanzhi();
   const currentDayun = dayunList.find(d => {
-    const age = new Date().getFullYear() - 1985;
+    const birthYear = baziData?.year || 1990;
+    const age = new Date().getFullYear() - birthYear;
     return age >= d.startAge && age <= d.endAge;
   }) || dayunList[0];
 
