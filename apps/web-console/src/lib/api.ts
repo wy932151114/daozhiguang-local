@@ -205,7 +205,7 @@ export async function generateAI(input: AiGenerateInput): Promise<APIResponse<Ai
       const guestRes = await axios.post('/api/v2/auth/guest', {}, { timeout: 5000 });
       if (guestRes.data?.accessToken) {
         token = guestRes.data.accessToken;
-        localStorage.setItem('dzs_v2_token', token);
+        localStorage.setItem('dzs_v2_token', token!);
       }
     } catch { /* 静默失败，无 token 走 V1 降级 */ }
   }

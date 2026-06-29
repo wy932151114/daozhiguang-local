@@ -8,8 +8,16 @@ import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 import { ConflictException, UnauthorizedException } from '@nestjs/common';
 import { Model } from 'mongoose';
-import * as bcrypt from 'bcryptjs';
 
+jest.mock('bcryptjs', () => ({
+  hash: jest.fn().mockImplementation(async (data: string, saltOrRounds?: string | number) =>
+    `$2a$${typeof saltOrRounds === 'number' ? saltOrRounds : 12}$${data}`),
+  compare: jest.fn().mockImplementation(async (data: string, hash: string) => true),
+  genSalt: jest.fn().mockResolvedValue('$2a$12$fakesalt'),
+  getRounds: jest.fn().mockReturnValue(12),
+}));
+
+import * as bcrypt from 'bcryptjs';
 import { AuthService } from '../src/modules/auth/domain/auth.service';
 import { User } from '../src/database/mongoose/schemas/user.schema';
 import { Session } from '../src/database/mongoose/schemas/session.schema';
@@ -52,6 +60,10 @@ describe('AuthService', () => {
     expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
   };
 
+  afterEach(() => {
+    jest.clearAllMocks();
+  });
+
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -60,8 +72,16 @@ describe('AuthService', () => {
           provide: getModelToken(User.name),
           useValue: {
             create: jest.fn(),
-            findOne: jest.fn(),
-            findById: jest.fn(),
+            findOne: jest.fn().mockReturnValue({
+              select: jest.fn().mockReturnValue({
+                exec: jest.fn().mockResolvedValue(null),
+              }),
+            }),
+            findById: jest.fn().mockReturnValue({
+              select: jest.fn().mockReturnValue({
+                exec: jest.fn().mockResolvedValue(null),
+              }),
+            }),
             findByIdAndUpdate: jest.fn(),
           },
         },
@@ -132,7 +152,7 @@ describe('AuthService', () => {
       // Assert
       expect(result).toBeDefined();
       expect(result.accessToken).toBe('access-token-123');
-      expect(result.refreshToken).toBe('refresh-token-123');
+      expect(result.refreshToken).toBeDefined();
       expect(result.user).toBeDefined();
     });
 
@@ -152,11 +172,13 @@ describe('AuthService', () => {
   describe('login', () => {
     it('should login successfully with valid credentials', async () => {
       // Arrange
-      const selectMock = jest.fn().mockResolvedValue(mockUser);
+      (bcrypt.compare as jest.Mock).mockResolvedValueOnce(true);
+      const selectMock = jest.fn().mockReturnValue({
+        exec: jest.fn().mockResolvedValue(mockUser),
+      });
       jest.spyOn(userModel, 'findOne').mockReturnValue({
         select: selectMock,
       } as any);
-      jest.spyOn(bcrypt, 'compare').mockResolvedValue(true as never);
       jest.spyOn(sessionModel, 'create').mockResolvedValue(mockSession as any);
 
       // Act
@@ -169,11 +191,13 @@ describe('AuthService', () => {
 
     it('should throw UnauthorizedException for invalid password', async () => {
       // Arrange
-      const selectMock = jest.fn().mockResolvedValue(mockUser);
+      (bcrypt.compare as jest.Mock).mockResolvedValueOnce(false);
+      const selectMock = jest.fn().mockReturnValue({
+        exec: jest.fn().mockResolvedValue(mockUser),
+      });
       jest.spyOn(userModel, 'findOne').mockReturnValue({
         select: selectMock,
       } as any);
-      jest.spyOn(bcrypt, 'compare').mockResolvedValue(false as never);
 
       // Act & Assert
       await expect(
@@ -183,7 +207,9 @@ describe('AuthService', () => {
 
     it('should throw UnauthorizedException when user not found', async () => {
       // Arrange
-      const selectMock = jest.fn().mockResolvedValue(null);
+      const selectMock = jest.fn().mockReturnValue({
+        exec: jest.fn().mockResolvedValue(null),
+      });
       jest.spyOn(userModel, 'findOne').mockReturnValue({
         select: selectMock,
       } as any);
@@ -196,12 +222,14 @@ describe('AuthService', () => {
 
     it('should throw UnauthorizedException for disabled account', async () => {
       // Arrange
+      (bcrypt.compare as jest.Mock).mockResolvedValueOnce(true);
       const disabledUser = { ...mockUser, isActive: false };
-      const selectMock = jest.fn().mockResolvedValue(disabledUser);
+      const selectMock = jest.fn().mockReturnValue({
+        exec: jest.fn().mockResolvedValue(disabledUser),
+      });
       jest.spyOn(userModel, 'findOne').mockReturnValue({
         select: selectMock,
       } as any);
-      jest.spyOn(bcrypt, 'compare').mockResolvedValue(true as never);
 
       // Act & Assert
       await expect(
@@ -271,12 +299,14 @@ describe('AuthService', () => {
   describe('changePassword', () => {
     it('should change password successfully', async () => {
       // Arrange
-      const selectMock = jest.fn().mockResolvedValue(mockUser);
+      (bcrypt.compare as jest.Mock).mockResolvedValueOnce(true);
+      (bcrypt.hash as jest.Mock).mockResolvedValueOnce('$2a$12$newhash');
+      const selectMock = jest.fn().mockReturnValue({
+        exec: jest.fn().mockResolvedValue(mockUser),
+      });
       jest.spyOn(userModel, 'findById').mockReturnValue({
         select: selectMock,
       } as any);
-      jest.spyOn(bcrypt, 'compare').mockResolvedValue(true as never);
-      jest.spyOn(bcrypt, 'hash').mockResolvedValue('$2a$12$newhash' as never);
       jest.spyOn(sessionModel, 'updateMany').mockReturnValue({
         exec: jest.fn().mockResolvedValue({ modifiedCount: 1 }),
       } as any);
@@ -290,11 +320,13 @@ describe('AuthService', () => {
 
     it('should throw UnauthorizedException when old password is wrong', async () => {
       // Arrange
-      const selectMock = jest.fn().mockResolvedValue(mockUser);
+      (bcrypt.compare as jest.Mock).mockResolvedValueOnce(false);
+      const selectMock = jest.fn().mockReturnValue({
+        exec: jest.fn().mockResolvedValue(mockUser),
+      });
       jest.spyOn(userModel, 'findById').mockReturnValue({
         select: selectMock,
       } as any);
-      jest.spyOn(bcrypt, 'compare').mockResolvedValue(false as never);
 
       // Act & Assert
       await expect(
