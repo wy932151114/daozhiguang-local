@@ -28,14 +28,13 @@ const SHI_CHEN = [
   { name: '亥时', start: '21:00', end: '22:59', index: 11 },
 ];
 
+/** 计算指定日期的日干支（基于1984年1月1日甲子日） */
 function getDayGanzhi(date: Date): { heavenly: string; earthly: string; full: string } {
-  const ref = new Date(2000, 0, 1);
+  const ref = new Date(1984, 0, 1);
   const diff = Math.round((date.getTime() - ref.getTime()) / 86400000);
-  return {
-    heavenly: TIAN_GAN[((diff % 10) + 10) % 10],
-    earthly: DI_ZHI[((diff % 12) + 12) % 12],
-    full: `${TIAN_GAN[((diff % 10) + 10) % 10]}${DI_ZHI[((diff % 12) + 12) % 12]}`,
-  };
+  const heavenly = TIAN_GAN[((diff % 10) + 10) % 10];
+  const earthly = DI_ZHI[((diff % 12) + 12) % 12];
+  return { heavenly, earthly, full: `${heavenly}${earthly}` };
 }
 
 function getCurrentShichen(): { name: string; start: string; end: string; index: number } {
@@ -145,16 +144,27 @@ function generateDailyFortune(baziData: any, dayGanzhi: string): {
 export default function FortunePage() {
   const [baziData, setBaziData] = useState<any>(null);
   const [activeCategory, setActiveCategory] = useState<FortuneCategory>('overall');
+  const [clientDate, setClientDate] = useState<Date | null>(null);
 
   useEffect(() => {
+    // 确保客户端日期（避免 SSR 锁定服务端时间）
+    setClientDate(new Date());
+    // 读取排盘数据
     const stored = sessionStorage.getItem('dzs_bazi_result');
     if (stored) {
       try { setBaziData(JSON.parse(stored)); } catch {}
     }
   }, []);
 
-  const now = new Date();
-  const dayGanzhi = getDayGanzhi(now);
+  if (!clientDate) {
+    return (
+      <div className="min-h-screen bg-gradient-to-b from-[#0a0e17] via-[#111827] to-[#0a0e17] text-[#e2e8f0] flex items-center justify-center">
+        <div className="text-[#64748b] text-sm">加载中...</div>
+      </div>
+    );
+  }
+
+  const dayGanzhi = getDayGanzhi(clientDate);
   const shichen = getCurrentShichen();
   const fortune = generateDailyFortune(baziData, dayGanzhi.full);
   const currentScore = fortune.scores[activeCategory];
@@ -168,7 +178,7 @@ export default function FortunePage() {
           </button>
           <h1 className="text-sm font-semibold">每日运势</h1>
           <span className="text-[10px] text-[#64748b] ml-auto">
-            {now.getFullYear()}年{now.getMonth() + 1}月{now.getDate()}日
+            {clientDate.getFullYear()}年{clientDate.getMonth() + 1}月{clientDate.getDate()}日
           </span>
         </div>
       </header>
@@ -179,7 +189,7 @@ export default function FortunePage() {
             <div>
               <div className="text-lg font-bold text-[#f59e0b]">{dayGanzhi.full}日</div>
               <div className="text-xs text-[#64748b] mt-1">
-                农历{getLunarDate(now)} · {shichen.name}
+                · {shichen.name}
               </div>
             </div>
             <div className="text-right">

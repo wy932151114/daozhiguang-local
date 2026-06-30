@@ -43,6 +43,38 @@ const SHICHEN = [
   { label: '亥时 21:00-22:59', val: '21' },
 ];
 
+// ============ 时辰→具体时间 辅助函数 ============
+
+/** 根据时辰起始小时，生成每5分钟的具体时间选项（覆盖两小时，共24个） */
+function getTimeOptions(shichenHour: string): { value: number; label: string }[] {
+  const startHour = shichenHour ? parseInt(shichenHour) : 11; // 默认午时
+  const options: { value: number; label: string }[] = [];
+  for (let offset = 0; offset < 120; offset += 5) {
+    const h = (startHour + Math.floor(offset / 60)) % 24;
+    const m = offset % 60;
+    options.push({
+      value: offset,
+      label: `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`,
+    });
+  }
+  return options;
+}
+
+/** 将时辰起始小时 + 分钟偏移量(0-119) 转为实际时和分 */
+function offsetToActualTime(shichenHour: string, offset: number): { hour: number; minute: number } {
+  const startHour = shichenHour ? parseInt(shichenHour) : 11;
+  return {
+    hour: (startHour + Math.floor(offset / 60)) % 24,
+    minute: offset % 60,
+  };
+}
+
+/** 将时辰起始小时 + 分钟偏移量(0-119) 转为显示格式 "HH:MM" */
+function formatShichenTime(shichenHour: string, offset: number): string {
+  const { hour, minute } = offsetToActualTime(shichenHour, offset);
+  return `${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}`;
+}
+
 /** 功能模块定义 */
 const MODULES = [
   {
@@ -167,9 +199,11 @@ export default function HomePage() {
   const handleSubmit = async () => {
     if (!year || !month || !day) { setError('请填写出生年月日'); return; }
     setLoading(true); setError(''); setResult(null);
+    const offset = parseInt(minute || '0');
+    const { hour: actualHour, minute: actualMinute } = offsetToActualTime(hour, offset);
     const payload: any = {
       year: parseInt(year), month: parseInt(month), day: parseInt(day),
-      hour: hour ? parseInt(hour) : 12, minute: parseInt(minute || '0'), gender,
+      hour: actualHour, minute: actualMinute, gender,
     };
     if (useTrueSolar && longitude) { payload.longitude = parseFloat(longitude); payload.useTrueSolar = true; }
     try {
@@ -183,16 +217,17 @@ export default function HomePage() {
         try { sessionStorage.setItem('dzs_bazi_result', JSON.stringify(data.data)); } catch {}
         try { sessionStorage.setItem('dzs_bazi_input', JSON.stringify({
           year: parseInt(year), month: parseInt(month), day: parseInt(day),
-          hour: hour ? parseInt(hour) : 12, minute: parseInt(minute || '0'),
+          hour: actualHour, minute: actualMinute,
           gender, birthPlace: '',
           longitude: useTrueSolar ? parseFloat(longitude || '120') : 120,
           useTrueSolar: useTrueSolar ?? true,
         })); } catch {}
+        const timeDisplay = formatShichenTime(hour, offset);
         const record = {
           id: Date.now(),
-          time: `${year}-${month.padStart(2,'0')}-${day.padStart(2,'0')} ${hour || '?'}:${minute.padStart(2,'0')}`,
+          time: `${year}-${month.padStart(2,'0')}-${day.padStart(2,'0')} ${timeDisplay}`,
           gender,
-          input: { year: parseInt(year), month: parseInt(month), day: parseInt(day), hour: hour ? parseInt(hour) : 12, minute: parseInt(minute || '0'), gender, longitude: useTrueSolar ? parseFloat(longitude) : undefined, useTrueSolar },
+          input: { year: parseInt(year), month: parseInt(month), day: parseInt(day), hour: actualHour, minute: actualMinute, gender, longitude: useTrueSolar ? parseFloat(longitude) : undefined, useTrueSolar },
           pillars: data.data.pillars, dayMaster: data.data.dayMaster,
           trueSolar: useTrueSolar ? `经度${longitude}°E` : undefined,
           createdAt: new Date().toISOString(),
@@ -385,13 +420,12 @@ export default function HomePage() {
                   </select>
                 </div>
                 <div>
-                  <label className="text-xs text-[#64748b] mb-1 block">分钟</label>
+                  <label className="text-xs text-[#64748b] mb-1 block">具体时间</label>
                   <select value={minute} onChange={e => setMinute(e.target.value)}
                     className="w-full bg-[#1a2332] border border-[#2a3a4e] rounded-lg px-3 py-2.5 text-sm text-[#e2e8f0] focus:border-[#f59e0b] focus:outline-none focus:ring-1 focus:ring-[#f59e0b]/20 transition-all">
-                    <option value="0">00分</option>
-                    <option value="15">15分</option>
-                    <option value="30">30分</option>
-                    <option value="45">45分</option>
+                    {getTimeOptions(hour).map(opt => (
+                      <option key={opt.value} value={String(opt.value)}>{opt.label}</option>
+                    ))}
                   </select>
                 </div>
               </div>

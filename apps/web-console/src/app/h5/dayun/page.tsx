@@ -21,7 +21,7 @@ function getShiShen(dayMaster: string, gan: string): string {
   return male[diff] || '';
 }
 
-function generateDayun(baziData: any): Array<{
+function generateDayun(baziData: any, birthYear: number, birthMonth: number): Array<{
   startAge: number; endAge: number; ganzhi: string; heavenly: string; earthly: string;
   wuxing: string; shishen: string; score: number; desc: string;
 }> {
@@ -34,7 +34,11 @@ function generateDayun(baziData: any): Array<{
   const isYearYang = ['甲', '丙', '戊', '庚', '壬'].includes(yearGan);
   const isMale = gender === '男';
   const forward = (isYearYang && isMale) || (!isYearYang && !isMale);
-  const startAge = 3;
+  // 粗略计算起运年龄：根据出生年距离上一个/下一个"节"的天数估算
+  // 简化算法：阳男阴女顺排，从生日到下一个节气；阴男阳女逆排，到上一个节气
+  // 这里做一个粗略估算，以出生月份为参考
+  const roughStartAge = Math.max(1, Math.round((birthMonth - 1) * 0.3));
+  const startAge = roughStartAge;
   const dayunList = [];
   for (let i = 0; i < 10; i++) {
     const offset = forward ? i + 1 : -(i + 1);
@@ -66,17 +70,29 @@ function getCurrentYearGanzhi(): string {
 
 export default function DayunPage() {
   const [baziData, setBaziData] = useState<any>(null);
+  const [birthYear, setBirthYear] = useState<number | null>(null);
+  const [birthMonth, setBirthMonth] = useState<number | null>(null);
   useEffect(() => {
     const stored = sessionStorage.getItem('dzs_bazi_result');
     if (stored) { try { setBaziData(JSON.parse(stored)); } catch {} }
+    // 读取排盘输入中的出生年月
+    const inputStr = sessionStorage.getItem('dzs_bazi_input');
+    if (inputStr) {
+      try {
+        const input = JSON.parse(inputStr);
+        if (input.year) setBirthYear(input.year);
+        if (input.month) setBirthMonth(input.month);
+      } catch {}
+    }
   }, []);
 
-  const dayunList = generateDayun(baziData);
+  const dayunList = baziData && birthYear
+    ? generateDayun(baziData, birthYear, birthMonth || 5)
+    : [];
   const currentYearGanzhi = getCurrentYearGanzhi();
+  const currentAge = birthYear ? new Date().getFullYear() - birthYear : 0;
   const currentDayun = dayunList.find(d => {
-    const birthYear = baziData?.year || 1990;
-    const age = new Date().getFullYear() - birthYear;
-    return age >= d.startAge && age <= d.endAge;
+    return currentAge >= d.startAge && currentAge <= d.endAge;
   }) || dayunList[0];
 
   return (
